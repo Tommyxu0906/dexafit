@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DexaFit Wellness Hub · Concept</title>
+  <style>
+    :root{
+      --bg:#07111f;
+      --bg2:#0d1728;
+      --panel:#0f1b2d;
+      --panel2:#13243a;
+      --text:#f5f7fb;
+      --muted:#b8c4d6;
+      --line:rgba(255,255,255,.12);
+      --accent:#36d399;
+      --accent-d:#10b981;
+      --accent2:#60a5fa;
+      --warn:#fbbf24;
+      --danger:#fb7185;
+      --card:#ffffff;
+      --ink:#0f172a;
+      --ink2:#1f2937;
+      --sub:#5b6472;
+      --soft:#eef6ff;
+      --line2:#e5e7eb;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:#f5f7fb;
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+    }
+    .dark-top{
+      background:linear-gradient(180deg,#07111f 0%,#0d1728 100%);
+      padding-bottom:60px;
+      position:relative;
+    }
+    .dark-top::after{
+      content:"";position:absolute;left:0;right:0;bottom:-1px;height:60px;
+      background:linear-gradient(180deg,transparent,#f5f7fb);
+    }
+    .wrap{max-width:1180px;margin:0 auto;padding:24px 22px 90px}
+    .dark-top .wrap{padding:24px 22px 0}
+
+    /* NAV */
+    .nav{
+      display:flex;align-items:center;justify-content:space-between;
+      padding:14px 20px;margin-bottom:24px;
+      background:rgba(7,17,31,.7);backdrop-filter:blur(14px);
+      border:1px solid var(--line);border-radius:18px;
+      position:sticky;top:14px;z-index:50;
+    }
+    .brand{display:flex;gap:12px;align-items:center;font-weight:800;letter-spacing:.2px}
+    .mark{
+      width:38px;height:38px;border-radius:12px;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      display:grid;place-items:center;color:#07111f;font-weight:900;font-size:18px;
+      box-shadow:0 6px 20px rgba(54,211,153,.35);
+    }
+    .nav-links{display:flex;align-items:center;gap:6px}
+    .nav-links a{color:var(--muted);text-decoration:none;padding:8px 14px;border-radius:10px;font-size:14px;font-weight:600}
+    .nav-links a:hover{color:#fff;background:rgba(255,255,255,.06)}
+    .nav .cta-mini{background:var(--accent);color:#04111d;padding:10px 16px;border-radius:11px;font-weight:800;font-size:13.5px;text-decoration:none;margin-left:8px}
+
+    /* HERO */
+    .hero{display:grid;grid-template-columns:1.1fr .9fr;gap:32px;align-items:center;padding:30px 0 64px}
+    .eyebrow{color:var(--accent);font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;display:inline-flex;align-items:center;gap:8px}
+    .eyebrow::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 4px rgba(54,211,153,.18)}
+    h1{font-size:60px;line-height:1;margin:14px 0 18px;letter-spacing:-.055em;font-weight:850}
+    h1 .grad{background:linear-gradient(120deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
+    .lead{font-size:19px;line-height:1.6;color:var(--muted);max-width:600px}
+    .cta-row{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
+    .btn{border:0;border-radius:13px;padding:14px 20px;font-weight:750;font-size:15px;text-decoration:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer;transition:transform .15s ease, box-shadow .2s ease}
+    .btn:hover{transform:translateY(-1px)}
+    .btn.primary{background:var(--accent);color:#04111d;box-shadow:0 10px 26px rgba(54,211,153,.32)}
+    .btn.secondary{background:rgba(255,255,255,.08);color:var(--text);border:1px solid var(--line)}
+    .btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line2)}
+    .btn.dark{background:var(--ink);color:#fff}
+    .hero-stats{display:flex;gap:28px;margin-top:36px;flex-wrap:wrap}
+    .hero-stats .stat b{display:block;font-size:28px;letter-spacing:-.03em}
+    .hero-stats .stat span{color:var(--muted);font-size:13px}
+
+    /* PHONE MOCK */
+    .phone{
+      background:rgba(255,255,255,.06);
+      border:1px solid var(--line);
+      border-radius:36px;
+      padding:14px;
+      box-shadow:0 30px 90px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.04);
+      position:relative;
+    }
+    .phone::before{content:"";position:absolute;top:18px;left:50%;transform:translateX(-50%);width:120px;height:24px;background:#040b15;border-radius:14px}
+    .screen{background:#f8fafc;color:var(--ink);border-radius:26px;padding:22px 18px 18px;min-height:560px;position:relative;overflow:hidden}
+    .mini-top{display:flex;justify-content:space-between;align-items:center;margin:14px 0 14px}
+    .mini-top b{font-size:15px}
+    .pill{font-size:11.5px;background:#e8f7ef;color:#0f7a4a;border-radius:999px;padding:6px 10px;font-weight:800;letter-spacing:.04em}
+    .score{background:linear-gradient(135deg,#07111f,#13243a);color:#fff;border-radius:18px;padding:18px;margin-bottom:12px;position:relative;overflow:hidden}
+    .score::after{content:"";position:absolute;right:-30px;top:-30px;width:120px;height:120px;background:radial-gradient(circle,rgba(54,211,153,.4),transparent 70%)}
+    .score h3{margin:0 0 8px;font-size:13px;color:#b8c4d6;text-transform:uppercase;letter-spacing:.08em;font-weight:700}
+    .score-num{font-size:28px;font-weight:850;letter-spacing:-.03em;line-height:1.1}
+    .score p{font-size:12.5px;color:#b8c4d6;line-height:1.5;margin:8px 0 0}
+    .insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+    .insight{background:#fff;border:1px solid var(--line2);border-radius:14px;padding:11px 12px}
+    .insight small{color:#6b7280;font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:.05em}
+    .insight b{display:block;font-size:16px;margin-top:4px;letter-spacing:-.01em}
+
+    /* SECTIONS */
+    .section{color:var(--ink);margin-top:52px;scroll-margin-top:100px}
+    .section h2{font-size:38px;letter-spacing:-.035em;margin:0 0 12px;font-weight:850}
+    .section .sub{color:var(--sub);line-height:1.6;font-size:17px;margin-bottom:28px;max-width:720px}
+    .section-head{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}
+    .chip{
+      display:inline-flex;align-items:center;gap:8px;
+      font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+      color:#047857;background:transparent;
+      padding:6px 12px 6px 8px;border-radius:999px;
+      border:1px solid rgba(4,120,87,.18);
+      margin-bottom:14px;
+    }
+    .chip::before{content:"";width:7px;height:7px;border-radius:50%;background:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,.18)}
+    .chip.blue{color:#1d4ed8;border-color:rgba(29,78,216,.18)}
+    .chip.blue::before{background:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.18)}
+
+    /* WHY / VALUE STRIP */
+    .value-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:6px}
+    .vcard{background:#fff;border:1px solid var(--line2);border-radius:18px;padding:18px}
+    .vcard .ic{width:38px;height:38px;border-radius:11px;background:#ecfdf5;color:#047857;display:grid;place-items:center;font-weight:900;margin-bottom:12px}
+    .vcard.b .ic{background:#eff6ff;color:#1d4ed8}
+    .vcard.y .ic{background:#fffbeb;color:#b45309}
+    .vcard.r .ic{background:#fef2f2;color:#be123c}
+    .vcard h4{margin:0 0 6px;font-size:16px;letter-spacing:-.01em}
+    .vcard p{margin:0;color:#667085;line-height:1.5;font-size:14px}
+
+    /* JOURNEY */
+    .flow{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;position:relative}
+    .step{background:#fff;border:1px solid var(--line2);border-radius:20px;padding:20px;position:relative}
+    .step .num{width:34px;height:34px;border-radius:11px;background:#ecfdf5;color:#047857;display:grid;place-items:center;font-weight:900;margin-bottom:14px}
+    .step h3{margin:0 0 8px;font-size:17px;letter-spacing:-.01em}
+    .step p{margin:0;color:#667085;line-height:1.55;font-size:14px}
+
+    /* ASSESSMENT */
+    .assess{background:linear-gradient(135deg,#0f1b2d,#13243a);color:#fff;border-radius:26px;padding:34px;border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden}
+    .assess::before{content:"";position:absolute;right:-100px;top:-100px;width:320px;height:320px;background:radial-gradient(circle,rgba(54,211,153,.22),transparent 70%);pointer-events:none}
+    .assess::after{content:"";position:absolute;left:-80px;bottom:-80px;width:240px;height:240px;background:radial-gradient(circle,rgba(96,165,250,.18),transparent 70%);pointer-events:none}
+    .assess-grid{display:grid;grid-template-columns:1.05fr .95fr;gap:30px;align-items:start;position:relative;z-index:1}
+    .assess h3{font-size:22px;margin:0 0 8px;letter-spacing:-.02em}
+    .assess .qlabel{color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:10px}
+    .opts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:18px}
+    .opt{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.04);color:#fff;border-radius:13px;padding:13px 14px;cursor:pointer;font-weight:700;font-size:14px;text-align:left;transition:all .15s ease}
+    .opt:hover{background:rgba(255,255,255,.09)}
+    .opt.active{background:var(--accent);color:#04111d;border-color:var(--accent)}
+    .result-card{background:#fff;color:var(--ink);border-radius:18px;padding:22px;box-shadow:0 18px 50px rgba(0,0,0,.28)}
+    .result-card .label{font-size:12px;text-transform:uppercase;letter-spacing:.1em;color:#6b7280;font-weight:800}
+    .result-card h4{font-size:22px;margin:6px 0 10px;letter-spacing:-.02em}
+    .result-card p{margin:0 0 14px;color:#5b6472;line-height:1.55;font-size:14.5px}
+    .progress{height:6px;background:#eef2f7;border-radius:99px;overflow:hidden;margin-top:14px}
+    .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));border-radius:99px;transition:width .6s ease}
+    .mini-rec{display:flex;align-items:center;gap:12px;padding:10px;border:1px solid var(--line2);border-radius:13px;margin-top:10px}
+    .mini-rec .dot{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#ecfdf5,#eff6ff);display:grid;place-items:center;font-weight:900;color:#047857}
+    .mini-rec b{display:block;font-size:14px}
+    .mini-rec small{color:#6b7280;font-size:12.5px}
+
+    /* HUB */
+    .hub{display:grid;grid-template-columns:280px 1fr;gap:22px;align-items:start;margin-top:18px}
+    .sidebar{background:#fff;border:1px solid var(--line2);border-radius:22px;padding:14px;position:sticky;top:100px}
+    .sb-head{font-size:11.5px;color:#6b7280;font-weight:800;text-transform:uppercase;letter-spacing:.08em;padding:8px 10px 6px}
+    .filter{padding:11px 14px;border-radius:12px;margin-bottom:4px;color:#334155;font-weight:700;font-size:14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;transition:background .15s ease}
+    .filter:hover{background:#f8fafc}
+    .filter.active{background:#eef6ff;color:#1d4ed8}
+    .filter .count{background:#e5e7eb;color:#475569;font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px}
+    .filter.active .count{background:#dbeafe;color:#1d4ed8}
+    .main-panel{display:grid;gap:14px}
+    .recommend{display:grid;grid-template-columns:1fr auto;gap:18px;align-items:center;background:#fff;border:1px solid var(--line2);border-radius:22px;padding:20px;transition:box-shadow .2s ease, transform .15s ease}
+    .recommend:hover{box-shadow:0 16px 50px rgba(15,23,42,.08);transform:translateY(-2px)}
+    .tag{display:inline-block;border-radius:999px;padding:5px 10px;background:#f1f5f9;color:#475569;font-size:11.5px;font-weight:800;margin-right:6px;margin-bottom:8px;letter-spacing:.02em}
+    .tag.green{background:#ecfdf5;color:#047857}
+    .tag.blue{background:#eff6ff;color:#1d4ed8}
+    .tag.yellow{background:#fffbeb;color:#b45309}
+    .tag.pink{background:#fdf2f8;color:#be185d}
+    .recommend h3{margin:4px 0 8px;font-size:20px;letter-spacing:-.015em}
+    .recommend p{margin:0 0 12px;color:#5b6472;line-height:1.55;font-size:14.5px}
+    .rec-meta{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:#475569;font-weight:700}
+    .rec-meta span{display:inline-flex;align-items:center;gap:5px}
+    .match{
+      width:108px;height:108px;border-radius:24px;
+      background:conic-gradient(var(--accent) calc(var(--p,90)*1%), #eef2f7 0);
+      display:grid;place-items:center;
+    }
+    .match .inner{width:84px;height:84px;border-radius:20px;background:#fff;display:grid;place-items:center;text-align:center}
+    .match span{display:block;font-size:24px;font-weight:900;letter-spacing:-.02em}
+    .match small{color:#6b7280;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+
+    /* CHART */
+    .bodycomp{background:#fff;border:1px solid var(--line2);border-radius:22px;padding:22px;margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:24px;align-items:center}
+    .bodycomp h3{margin:0 0 6px;font-size:20px;letter-spacing:-.02em}
+    .bodycomp p{margin:0;color:#5b6472;line-height:1.55;font-size:14.5px}
+    .bar-row{display:flex;align-items:center;gap:12px;margin-top:14px}
+    .bar-row .lbl{width:120px;font-weight:700;font-size:13.5px;color:#1f2937}
+    .bar{flex:1;height:12px;background:#eef2f7;border-radius:99px;overflow:hidden;position:relative}
+    .bar i{display:block;height:100%;border-radius:99px;transition:width 1s ease}
+    .bar i.muscle{background:linear-gradient(90deg,#10b981,#34d399)}
+    .bar i.fat{background:linear-gradient(90deg,#f59e0b,#fbbf24)}
+    .bar i.visceral{background:linear-gradient(90deg,#fb7185,#f43f5e)}
+    .bar i.bmd{background:linear-gradient(90deg,#60a5fa,#3b82f6)}
+    .bar-row .val{font-weight:800;font-size:13px;color:#1f2937;min-width:60px;text-align:right}
+
+    /* PARTNERS */
+    .partner-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .partner{background:#fff;border:1px solid var(--line2);border-radius:22px;padding:20px;display:flex;flex-direction:column;gap:10px;transition:box-shadow .2s ease, transform .15s ease}
+    .partner:hover{box-shadow:0 16px 50px rgba(15,23,42,.08);transform:translateY(-2px)}
+    .partner-head{display:flex;align-items:center;gap:12px}
+    .avatar{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;font-weight:900;color:#fff;font-size:18px;letter-spacing:-.02em;flex-shrink:0}
+    .a1{background:linear-gradient(135deg,#10b981,#34d399)}
+    .a2{background:linear-gradient(135deg,#3b82f6,#60a5fa)}
+    .a3{background:linear-gradient(135deg,#f59e0b,#fbbf24)}
+    .a4{background:linear-gradient(135deg,#fb7185,#f43f5e)}
+    .a5{background:linear-gradient(135deg,#8b5cf6,#a78bfa)}
+    .a6{background:linear-gradient(135deg,#0ea5e9,#06b6d4)}
+    .partner-head h3{margin:0;font-size:16px;letter-spacing:-.01em}
+    .partner-head small{color:#6b7280;font-size:12.5px;font-weight:700}
+    .partner p{margin:0;color:#667085;line-height:1.55;font-size:14px;flex:1}
+    .partner-meta{display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid var(--line2);margin-top:auto}
+    .stars{color:#f59e0b;font-size:13px;font-weight:800}
+    .price{font-weight:800;color:#0f172a;font-size:14px}
+    .book{background:var(--ink);color:#fff;border:0;padding:9px 14px;border-radius:10px;font-weight:800;font-size:13px;cursor:pointer}
+    .book:hover{background:#1f2937}
+
+    /* TIMELINE */
+    .timeline{background:#fff;border:1px solid var(--line2);border-radius:22px;padding:24px;margin-top:18px}
+    .tl-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:0;position:relative;margin-top:18px}
+    .tl-grid::before{content:"";position:absolute;left:24px;right:24px;top:18px;height:2px;background:repeating-linear-gradient(90deg,#cbd5e1 0 6px,transparent 6px 12px)}
+    .tl-step{position:relative;padding:0 12px;text-align:center}
+    .tl-dot{width:38px;height:38px;border-radius:50%;background:#fff;border:2px solid var(--accent);color:#047857;font-weight:900;display:grid;place-items:center;margin:0 auto 12px;position:relative;z-index:1}
+    .tl-dot.future{border-color:#cbd5e1;color:#94a3b8}
+    .tl-step h4{margin:0 0 4px;font-size:15px;letter-spacing:-.01em}
+    .tl-step p{margin:0;color:#667085;font-size:13px;line-height:1.5}
+
+    /* TESTIMONIALS */
+    .quotes{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+    .quote{background:#fff;border:1px solid var(--line2);border-radius:22px;padding:22px}
+    .quote .stars{margin-bottom:10px}
+    .quote p{margin:0 0 14px;color:#1f2937;line-height:1.6;font-size:15px;font-weight:500}
+    .qfoot{display:flex;align-items:center;gap:10px}
+    .qfoot b{display:block;font-size:14px}
+    .qfoot small{color:#6b7280;font-size:12.5px}
+
+    /* FAQ */
+    .faq{background:#fff;border:1px solid var(--line2);border-radius:22px;overflow:hidden}
+    .faq details{border-bottom:1px solid var(--line2)}
+    .faq details:last-child{border-bottom:0}
+    .faq summary{padding:20px 24px;font-weight:800;font-size:16px;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;color:#0f172a}
+    .faq summary::-webkit-details-marker{display:none}
+    .faq summary::after{content:"+";font-size:22px;color:#94a3b8;font-weight:400}
+    .faq details[open] summary::after{content:"−"}
+    .faq .ans{padding:0 24px 20px;color:#5b6472;line-height:1.6;font-size:14.5px}
+
+    /* CTA FINAL */
+    .cta-final{background:linear-gradient(135deg,#0f1b2d,#13243a);color:#fff;border-radius:26px;padding:48px;text-align:center;position:relative;overflow:hidden;margin-top:52px}
+    .cta-final::before{content:"";position:absolute;left:50%;top:0;transform:translate(-50%,-30%);width:520px;height:520px;border-radius:50%;background:radial-gradient(circle,rgba(54,211,153,.2),transparent 70%)}
+    .cta-final h2{font-size:38px;margin:0 0 12px;letter-spacing:-.035em;position:relative}
+    .cta-final p{color:var(--muted);font-size:17px;max-width:580px;margin:0 auto 24px;position:relative;line-height:1.6}
+    .cta-final .cta-row{justify-content:center;position:relative}
+
+    /* FOOTER */
+    .footer{margin-top:48px;padding-top:30px;border-top:1px solid var(--line2);display:flex;justify-content:space-between;align-items:center;color:#6b7280;font-size:13.5px;flex-wrap:wrap;gap:14px}
+    .footer .brand{color:var(--ink)}
+
+    /* AI CHAT WIDGET */
+    .chat-fab{
+      position:fixed;right:24px;bottom:24px;z-index:60;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#04111d;border:0;border-radius:99px;
+      padding:14px 20px;font-weight:800;font-size:14px;
+      box-shadow:0 14px 40px rgba(54,211,153,.4);cursor:pointer;
+      display:inline-flex;align-items:center;gap:8px;
+    }
+    .chat-fab .pulse{width:8px;height:8px;border-radius:50%;background:#04111d;box-shadow:0 0 0 0 rgba(4,17,29,.5);animation:pulse 1.6s infinite}
+    @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(4,17,29,.5)}70%{box-shadow:0 0 0 10px rgba(4,17,29,0)}100%{box-shadow:0 0 0 0 rgba(4,17,29,0)}}
+    .chat-panel{
+      position:fixed;right:24px;bottom:88px;z-index:60;
+      width:360px;max-width:calc(100vw - 36px);
+      background:#fff;color:var(--ink);
+      border:1px solid var(--line2);border-radius:22px;
+      box-shadow:0 24px 70px rgba(15,23,42,.25);
+      display:none;flex-direction:column;overflow:hidden;
+    }
+    .chat-panel.open{display:flex}
+    .chat-head{background:linear-gradient(135deg,#0f1b2d,#13243a);color:#fff;padding:16px 18px;display:flex;justify-content:space-between;align-items:center}
+    .chat-head b{font-size:15px}
+    .chat-head small{color:var(--muted);display:block;font-size:12px;margin-top:2px}
+    .chat-head .x{background:transparent;border:0;color:#fff;font-size:20px;cursor:pointer;opacity:.7}
+    .chat-body{padding:16px;max-height:340px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+    .msg{padding:11px 14px;border-radius:16px;font-size:14px;line-height:1.5;max-width:85%}
+    .msg.bot{background:#f1f5f9;color:#0f172a;border-bottom-left-radius:6px}
+    .msg.user{background:var(--ink);color:#fff;align-self:flex-end;border-bottom-right-radius:6px}
+    .chat-input{display:flex;border-top:1px solid var(--line2)}
+    .chat-input input{flex:1;border:0;padding:14px 16px;font-size:14px;outline:none;font-family:inherit}
+    .chat-input button{background:var(--accent);color:#04111d;border:0;padding:0 18px;font-weight:800;cursor:pointer}
+
+    /* MODAL */
+    .modal-bg{position:fixed;inset:0;background:rgba(7,17,31,.6);backdrop-filter:blur(6px);z-index:70;display:none;align-items:center;justify-content:center;padding:20px}
+    .modal-bg.open{display:flex}
+    .modal{background:#fff;color:var(--ink);border-radius:22px;max-width:480px;width:100%;padding:28px;position:relative}
+    .modal h3{margin:0 0 8px;font-size:22px;letter-spacing:-.02em}
+    .modal p{margin:0 0 18px;color:#5b6472;line-height:1.55;font-size:14.5px}
+    .modal .close{position:absolute;right:18px;top:14px;background:transparent;border:0;font-size:24px;cursor:pointer;color:#94a3b8}
+    .modal input,.modal select{width:100%;padding:13px 14px;border:1px solid var(--line2);border-radius:11px;font-size:14px;font-family:inherit;margin-bottom:10px;outline:none}
+    .modal input:focus,.modal select:focus{border-color:var(--accent)}
+    .modal .btn{width:100%;justify-content:center;margin-top:6px}
+    .modal .success{text-align:center;padding:14px}
+    .modal .success .check{width:60px;height:60px;border-radius:50%;background:#ecfdf5;color:#047857;display:grid;place-items:center;font-size:30px;margin:0 auto 14px;font-weight:900}
+
+    @media (max-width:960px){
+      .hero,.hub,.assess-grid,.bodycomp{grid-template-columns:1fr}
+      .value-strip,.flow,.partner-grid,.quotes,.tl-grid{grid-template-columns:1fr 1fr}
+      .tl-grid::before{display:none}
+      h1{font-size:42px}
+      .section h2,.cta-final h2{font-size:30px}
+      .nav-links a:not(.cta-mini){display:none}
+      .sidebar{position:static}
+    }
+    @media (max-width:560px){
+      .value-strip,.flow,.partner-grid,.quotes,.tl-grid,.opts{grid-template-columns:1fr}
+      .recommend{grid-template-columns:1fr}
+      .match{margin:0}
+    }
+  </style>
+</head>
+<body>
+  <div class="dark-top">
+  <div class="wrap">
+
+    <!-- NAV -->
+    <nav class="nav">
+      <div class="brand"><div class="mark">D</div> DexaFit Wellness Hub</div>
+      <div class="nav-links">
+        <a href="#why">Why</a>
+        <a href="#flow">Flow</a>
+        <a href="#assessment">Pathway</a>
+        <a href="#hub">Hub</a>
+        <a href="#partners">Partners</a>
+        <a class="cta-mini" href="#cta">Book a Scan</a>
+      </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Concept · Post-scan experience</div>
+        <h1>Your scan shouldn't end with <span class="grad">a PDF.</span></h1>
+        <p class="lead">The Wellness Hub turns DEXA, RMR, VO₂ Max, and lab results into a personalized action plan — matched with vetted local trainers, dietitians, recovery, and coaching. Data in, transformation out.</p>
+        <div class="cta-row">
+          <a class="btn primary" href="#assessment">Build my pathway →</a>
+          <a class="btn secondary" href="#hub">Explore the Hub</a>
+        </div>
+        <div class="hero-stats">
+          <div class="stat"><b>3×</b><span>higher retention vs. report-only</span></div>
+          <div class="stat"><b>12 wk</b><span>average to measurable change</span></div>
+          <div class="stat"><b>250+</b><span>vetted local partners</span></div>
+        </div>
+      </div>
+
+      <div class="phone">
+        <div class="screen">
+          <div class="mini-top">
+            <b>Your Post-Scan Plan</b>
+            <span class="pill">● Ready</span>
+          </div>
+          <div class="score">
+            <h3>Transformation Priority</h3>
+            <div class="score-num">Build lean mass</div>
+            <p>Lean mass is below goal while RMR shows nutrition must support strength training, not calorie cutting.</p>
+          </div>
+          <div class="insight-grid">
+            <div class="insight"><small>DEXA · Lean</small><b>134.2 lb</b></div>
+            <div class="insight"><small>RMR</small><b>2,040 kcal</b></div>
+            <div class="insight"><small>VO₂ Max</small><b>38.4 ml/kg</b></div>
+            <div class="insight"><small>Visceral fat</small><b>0.9 lb</b></div>
+          </div>
+          <div style="background:#fff;border:1px solid var(--line2);border-radius:16px;padding:14px;margin-top:10px">
+            <small style="color:#6b7280;font-weight:800;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Top match · 94%</small>
+            <b style="display:block;font-size:14.5px;margin:4px 0 8px">12-week recomp track + Coach Maya</b>
+            <button class="btn primary" style="padding:9px 14px;font-size:12.5px" onclick="openModal('Coach Maya · Recomp Track')">Book consult</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+  </div>
+
+  <div class="wrap">
+    <!-- VALUE -->
+    <section class="section" id="why">
+      <div class="section-head">
+        <div>
+          <div class="chip">The opportunity</div>
+          <h2>Most clients walk out with numbers — not next steps.</h2>
+          <p class="sub">DexaFit already owns the most credible body data in fitness. The Wellness Hub turns that data into a recurring revenue, retention, and referral engine.</p>
+        </div>
+      </div>
+      <div class="value-strip">
+        <div class="vcard"><div class="ic">📈</div><h4>Higher conversion</h4><p>Clients act on results within 7 days, while motivation is fresh and the data still feels personal.</p></div>
+        <div class="vcard b"><div class="ic">🔁</div><h4>Repeat testing</h4><p>Every recommendation ends with a retest milestone. The loop drives scan #2, #3, and beyond.</p></div>
+        <div class="vcard y"><div class="ic">🤝</div><h4>Partner revenue</h4><p>Curated local network generates referral fees and exclusive packages for the DexaFit member base.</p></div>
+        <div class="vcard r"><div class="ic">💎</div><h4>Brand moat</h4><p>Competitors sell tests. DexaFit sells outcomes — the only platform connecting data to transformation.</p></div>
+      </div>
+    </section>
+
+    <!-- FLOW -->
+    <section class="section" id="flow">
+      <div class="chip blue">The client journey</div>
+      <h2>From scan to transformation in four steps.</h2>
+      <p class="sub">After a DEXA, VO₂ Max, RMR, or lab result, clients should immediately know what their numbers mean — and exactly who can help.</p>
+      <div class="flow">
+        <div class="step">
+          <div class="num">1</div>
+          <h3>Scan complete</h3>
+          <p>Client receives results. Instead of leaving with raw data, the system identifies a primary transformation priority.</p>
+        </div>
+        <div class="step">
+          <div class="num">2</div>
+          <h3>AI pathway</h3>
+          <p>DEXA, VO₂, RMR, labs, goals, budget, and location convert into a ranked 3–5 step action plan.</p>
+        </div>
+        <div class="step">
+          <div class="num">3</div>
+          <h3>Curated marketplace</h3>
+          <p>Vetted providers across trainers, dietitians, recovery, supplements, coaching, and retest packages.</p>
+        </div>
+        <div class="step">
+          <div class="num">4</div>
+          <h3>Retest loop</h3>
+          <p>Every plan ends with a measurable milestone — and a scheduled DexaFit retest to prove progress.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ASSESSMENT -->
+    <section class="section" id="assessment">
+      <div class="chip">Interactive · Live demo</div>
+      <h2>Build your pathway.</h2>
+      <p class="sub">Three quick inputs simulate what a post-scan client would see. Try changing your goal and watch the recommendations update.</p>
+      <div class="assess">
+        <div class="assess-grid">
+          <div>
+            <div class="qlabel">1 · Your primary goal</div>
+            <div class="opts" data-q="goal">
+              <button class="opt active" data-val="recomp">Body recomposition</button>
+              <button class="opt" data-val="fatloss">Lose visceral fat</button>
+              <button class="opt" data-val="endurance">Boost endurance</button>
+              <button class="opt" data-val="longevity">Longevity & labs</button>
+            </div>
+            <div class="qlabel">2 · How much time per week?</div>
+            <div class="opts" data-q="time">
+              <button class="opt" data-val="low">2–3 hours</button>
+              <button class="opt active" data-val="mid">4–6 hours</button>
+              <button class="opt" data-val="high">7+ hours</button>
+              <button class="opt" data-val="flex">Flexible</button>
+            </div>
+            <div class="qlabel">3 · Support style</div>
+            <div class="opts" data-q="support">
+              <button class="opt active" data-val="hands">Hands-on coach</button>
+              <button class="opt" data-val="self">Self-guided + check-ins</button>
+              <button class="opt" data-val="hybrid">Hybrid</button>
+              <button class="opt" data-val="group">Small group</button>
+            </div>
+          </div>
+          <div>
+            <div class="result-card" id="resultCard">
+              <span class="label">Recommended pathway · <span id="matchPct">94</span>% match</span>
+              <h4 id="resultTitle">12-week body recomposition track</h4>
+              <p id="resultDesc">Strength training calibrated to your lean mass + nutrition built from your measured RMR. Pairs you with a coach for weekly check-ins and a retest at week 12.</p>
+              <div class="progress"><i id="progBar" style="width:94%"></i></div>
+              <div class="mini-rec"><div class="dot">M</div><div><b id="rec1Name">Coach Maya · Strength</b><small id="rec1Tag">3× weekly · Recomp specialist</small></div></div>
+              <div class="mini-rec"><div class="dot">N</div><div><b id="rec2Name">Nutritionist Priya</b><small id="rec2Tag">RMR-calibrated meal plan</small></div></div>
+              <div class="mini-rec"><div class="dot">D</div><div><b id="rec3Name">Retest DEXA at week 12</b><small id="rec3Tag">Pre-booked · 20% member rate</small></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HUB -->
+    <section class="section" id="hub">
+      <div class="chip blue">The mockup</div>
+      <h2>The Wellness Hub.</h2>
+      <p class="sub">A post-scan command center built around the question every client really asks: <b>"What should I do next?"</b> — before "What should I buy?"</p>
+
+      <div class="hub">
+        <aside class="sidebar">
+          <div class="sb-head">Filter by goal</div>
+          <div class="filter active" data-filter="all">Recommended for me <span class="count">3</span></div>
+          <div class="filter" data-filter="muscle">Build muscle <span class="count">2</span></div>
+          <div class="filter" data-filter="fat">Lose visceral fat <span class="count">2</span></div>
+          <div class="filter" data-filter="cardio">Improve VO₂ Max <span class="count">2</span></div>
+          <div class="filter" data-filter="nutrition">Nutrition & RMR <span class="count">2</span></div>
+          <div class="filter" data-filter="recovery">Recovery & mobility <span class="count">1</span></div>
+          <div class="filter" data-filter="supplements">Supplements <span class="count">1</span></div>
+          <div class="filter" data-filter="retest">Retest plan <span class="count">1</span></div>
+        </aside>
+
+        <main class="main-panel" id="recList">
+          <div class="recommend" data-cat="muscle,nutrition" style="--p:94">
+            <div>
+              <span class="tag green">Best next step</span><span class="tag blue">DEXA + RMR</span>
+              <h3>12-week body recomposition track</h3>
+              <p>Strength training, measured calorie targets, protein guidance, and a follow-up DEXA scan. Built for clients whose lean mass, fat mass, and RMR indicate they need a plan — not generic advice.</p>
+              <div class="rec-meta">
+                <span>⏱ 12 weeks</span><span>📍 Chicago · Lakeview</span><span>💰 From $189/mo</span><span>🔁 Retest included</span>
+              </div>
+            </div>
+            <div class="match" style="--p:94"><div class="inner"><span>94%</span><small>match</small></div></div>
+          </div>
+
+          <div class="recommend" data-cat="cardio" style="--p:88">
+            <div>
+              <span class="tag yellow">Cardio gap</span><span class="tag blue">VO₂ Max</span>
+              <h3>Zone-based endurance coaching</h3>
+              <p>Pair your VO₂ Max results with a coach who translates training zones into weekly sessions, recovery windows, and 8-week progress targets.</p>
+              <div class="rec-meta">
+                <span>⏱ 8 weeks</span><span>📍 Remote OK</span><span>💰 From $129/mo</span><span>🔁 Retest at week 8</span>
+              </div>
+            </div>
+            <div class="match" style="--p:88"><div class="inner"><span>88%</span><small>match</small></div></div>
+          </div>
+
+          <div class="recommend" data-cat="nutrition" style="--p:86">
+            <div>
+              <span class="tag green">Nutrition</span><span class="tag blue">RMR</span>
+              <h3>RMR-calibrated nutrition consult</h3>
+              <p>Instead of an online calculator, work with a registered dietitian who starts from your measured resting metabolic rate and your goal timeline.</p>
+              <div class="rec-meta">
+                <span>⏱ 4 sessions</span><span>📍 Virtual</span><span>💰 $320 total</span><span>🥗 Meal templates</span>
+              </div>
+            </div>
+            <div class="match" style="--p:86"><div class="inner"><span>86%</span><small>match</small></div></div>
+          </div>
+
+          <div class="recommend" data-cat="fat,nutrition" style="--p:82">
+            <div>
+              <span class="tag pink">Visceral fat</span><span class="tag blue">DEXA</span>
+              <h3>Metabolic reset · 6-week protocol</h3>
+              <p>Targeted at reducing visceral fat with structured cardio, time-restricted eating, and weekly accountability — measured by retest, not by scale.</p>
+              <div class="rec-meta">
+                <span>⏱ 6 weeks</span><span>📍 Chicago</span><span>💰 $249</span><span>🔁 Retest included</span>
+              </div>
+            </div>
+            <div class="match" style="--p:82"><div class="inner"><span>82%</span><small>match</small></div></div>
+          </div>
+
+          <div class="recommend" data-cat="recovery,muscle" style="--p:78">
+            <div>
+              <span class="tag yellow">Recovery</span><span class="tag blue">Training load</span>
+              <h3>Mobility + recovery membership</h3>
+              <p>Bi-weekly mobility sessions, sleep coaching, and on-demand recovery (sauna, contrast, massage). Recommended when training volume increases.</p>
+              <div class="rec-meta">
+                <span>⏱ Ongoing</span><span>📍 Lakeview</span><span>💰 $89/mo</span><span>🛁 Recovery suite</span>
+              </div>
+            </div>
+            <div class="match" style="--p:78"><div class="inner"><span>78%</span><small>match</small></div></div>
+          </div>
+
+          <div class="recommend" data-cat="supplements,longevity" style="--p:72">
+            <div>
+              <span class="tag green">Evidence-first</span><span class="tag blue">Labs + goals</span>
+              <h3>Supplement audit · 30 min consult</h3>
+              <p>Pharmacist-led review of your current stack against your labs and goals. No upsells — clear yes/no/maybe on each item with sourcing.</p>
+              <div class="rec-meta">
+                <span>⏱ 30 min</span><span>📍 Virtual</span><span>💰 $79</span><span>📋 Report included</span>
+              </div>
+            </div>
+            <div class="match" style="--p:72"><div class="inner"><span>72%</span><small>match</small></div></div>
+          </div>
+
+          <div class="recommend" data-cat="retest" style="--p:99">
+            <div>
+              <span class="tag green">Always recommended</span><span class="tag blue">DexaFit</span>
+              <h3>Pre-booked 12-week retest</h3>
+              <p>Lock in your retest date now. Member rate, calendar reminders, and a side-by-side scan comparison report waiting on day one.</p>
+              <div class="rec-meta">
+                <span>⏱ 20 min</span><span>📍 Any DexaFit location</span><span>💰 $79 member</span><span>📊 Comparison report</span>
+              </div>
+            </div>
+            <div class="match" style="--p:99"><div class="inner"><span>99%</span><small>match</small></div></div>
+          </div>
+        </main>
+      </div>
+
+      <!-- BODY COMP CHART -->
+      <div class="bodycomp">
+        <div>
+          <span class="tag blue">Your snapshot</span>
+          <h3>How recommendations are generated.</h3>
+          <p>Each bar maps a body composition signal to a partner category. As your retest results change, the Hub re-ranks every recommendation automatically.</p>
+        </div>
+        <div>
+          <div class="bar-row"><div class="lbl">Lean mass</div><div class="bar"><i class="muscle" style="width:62%"></i></div><div class="val">62% goal</div></div>
+          <div class="bar-row"><div class="lbl">Body fat %</div><div class="bar"><i class="fat" style="width:74%"></i></div><div class="val">74% goal</div></div>
+          <div class="bar-row"><div class="lbl">Visceral fat</div><div class="bar"><i class="visceral" style="width:48%"></i></div><div class="val">Watch</div></div>
+          <div class="bar-row"><div class="lbl">Bone density</div><div class="bar"><i class="bmd" style="width:88%"></i></div><div class="val">Strong</div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PARTNERS -->
+    <section class="section" id="partners">
+      <div class="chip">Vetted network</div>
+      <h2>Local partners, ranked by your data.</h2>
+      <p class="sub">A curated local network turns DexaFit from a testing appointment into a transformation platform. Every partner is reviewed, certified, and tied to a measurable retest outcome.</p>
+      <div class="partner-grid">
+        <div class="partner">
+          <div class="partner-head"><div class="avatar a1">M</div><div><h3>Coach Maya Reynolds</h3><small>NSCA-CSCS · Recomp specialist</small></div></div>
+          <p>Builds 12-week strength programs calibrated to DEXA lean mass and asymmetry. Tracks weekly with progressive overload templates.</p>
+          <div class="partner-meta"><span class="stars">★★★★★ <span style="color:#6b7280;font-weight:700">4.9 (218)</span></span><span class="price">$189/mo</span></div>
+          <button class="book" onclick="openModal('Coach Maya Reynolds')">Book consult</button>
+        </div>
+        <div class="partner">
+          <div class="partner-head"><div class="avatar a2">P</div><div><h3>Priya Shah, RD</h3><small>Registered Dietitian · RMR-driven plans</small></div></div>
+          <p>Designs meal plans grounded in your RMR, body composition, and labs. Specializes in protein periodization for recomp clients.</p>
+          <div class="partner-meta"><span class="stars">★★★★★ <span style="color:#6b7280;font-weight:700">4.9 (164)</span></span><span class="price">$80/session</span></div>
+          <button class="book" onclick="openModal('Priya Shah, RD')">Book consult</button>
+        </div>
+        <div class="partner">
+          <div class="partner-head"><div class="avatar a3">J</div><div><h3>Jordan Pak</h3><small>USAT Coach · VO₂ & endurance</small></div></div>
+          <p>Builds heart-rate-zone training plans from your VO₂ Max baseline. Remote-friendly with Strava and Garmin integration.</p>
+          <div class="partner-meta"><span class="stars">★★★★☆ <span style="color:#6b7280;font-weight:700">4.7 (92)</span></span><span class="price">$129/mo</span></div>
+          <button class="book" onclick="openModal('Jordan Pak')">Book consult</button>
+        </div>
+        <div class="partner">
+          <div class="partner-head"><div class="avatar a4">L</div><div><h3>Lena Ortiz, DPT</h3><small>Physical therapist · Recovery</small></div></div>
+          <p>Mobility, prehab, and recovery sessions integrated with your training load. Helps clients avoid setbacks during volume increases.</p>
+          <div class="partner-meta"><span class="stars">★★★★★ <span style="color:#6b7280;font-weight:700">5.0 (87)</span></span><span class="price">$110/visit</span></div>
+          <button class="book" onclick="openModal('Lena Ortiz, DPT')">Book consult</button>
+        </div>
+        <div class="partner">
+          <div class="partner-head"><div class="avatar a5">A</div><div><h3>Dr. Aaron Chen, PharmD</h3><small>Supplement audits · Labs review</small></div></div>
+          <p>Evidence-based supplement reviews with no upsells. Clear yes/no/maybe on each item against your labs and goals.</p>
+          <div class="partner-meta"><span class="stars">★★★★★ <span style="color:#6b7280;font-weight:700">4.8 (76)</span></span><span class="price">$79 audit</span></div>
+          <button class="book" onclick="openModal('Dr. Aaron Chen, PharmD')">Book consult</button>
+        </div>
+        <div class="partner">
+          <div class="partner-head"><div class="avatar a6">D</div><div><h3>DexaFit Retest</h3><small>12-week comparison scan</small></div></div>
+          <p>Pre-booked retest at member rates. Side-by-side comparison report ready on day one, sharable with your coach.</p>
+          <div class="partner-meta"><span class="stars">★★★★★ <span style="color:#6b7280;font-weight:700">4.9 (1.2k)</span></span><span class="price">$79 member</span></div>
+          <button class="book" onclick="openModal('DexaFit Retest')">Schedule</button>
+        </div>
+      </div>
+
+      <!-- TIMELINE -->
+      <div class="timeline">
+        <div class="chip blue">The retention loop</div>
+        <h3 style="margin:0 0 4px;font-size:22px;letter-spacing:-.02em">A 12-week pathway that ends back where it started.</h3>
+        <p style="margin:0;color:#5b6472;line-height:1.55;font-size:14.5px">Every recommendation completes the loop — turning one-off scans into a measurable transformation rhythm.</p>
+        <div class="tl-grid">
+          <div class="tl-step"><div class="tl-dot">1</div><h4>Week 0 · Baseline</h4><p>DEXA + RMR + VO₂ scan. Pathway generated.</p></div>
+          <div class="tl-step"><div class="tl-dot">2</div><h4>Week 1 · Match</h4><p>Coach + nutritionist onboarded. Plan locked.</p></div>
+          <div class="tl-step"><div class="tl-dot future">3</div><h4>Week 6 · Check-in</h4><p>Mid-point recalibration with your coach.</p></div>
+          <div class="tl-step"><div class="tl-dot future">4</div><h4>Week 12 · Retest</h4><p>Side-by-side comparison. New pathway begins.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TESTIMONIALS -->
+    <section class="section">
+      <div class="chip">What clients say</div>
+      <h2>Real change, not just numbers.</h2>
+      <p class="sub">Early concept testers describe the same shift: from "interesting data" to "I know exactly what to do tomorrow."</p>
+      <div class="quotes">
+        <div class="quote">
+          <div class="stars">★★★★★</div>
+          <p>"I'd done three DEXA scans before and they all just sat in my email. The Hub matched me with Maya in under a minute — and I retested 12 weeks later with +4 lb of lean mass."</p>
+          <div class="qfoot"><div class="avatar a1" style="width:36px;height:36px;border-radius:11px;font-size:14px">S</div><div><b>Sarah K.</b><small>Recomp track · Chicago</small></div></div>
+        </div>
+        <div class="quote">
+          <div class="stars">★★★★★</div>
+          <p>"Most apps push generic plans. This started from my actual RMR. My dietitian and I were aligned in one session instead of three."</p>
+          <div class="qfoot"><div class="avatar a2" style="width:36px;height:36px;border-radius:11px;font-size:14px">D</div><div><b>Daniel M.</b><small>Nutrition consult · Virtual</small></div></div>
+        </div>
+        <div class="quote">
+          <div class="stars">★★★★★</div>
+          <p>"Booking the retest at the same time as my coach was the unlock. It made the 12 weeks feel like a project, not a vibe."</p>
+          <div class="qfoot"><div class="avatar a3" style="width:36px;height:36px;border-radius:11px;font-size:14px">A</div><div><b>Alex R.</b><small>Endurance · Lakeview</small></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section">
+      <div class="chip blue">FAQ</div>
+      <h2>How it works.</h2>
+      <p class="sub">A few of the questions teams asked during the concept review.</p>
+      <div class="faq">
+        <details open>
+          <summary>How are partners vetted?</summary>
+          <div class="ans">Every partner submits credentials (CSCS, RD, DPT, PharmD, USAT, etc.), undergoes a methodology interview, and signs an outcomes agreement tied to client retest results. Reviews come from verified DexaFit members only.</div>
+        </details>
+        <details>
+          <summary>What data drives the recommendations?</summary>
+          <div class="ans">DEXA (lean mass, fat mass, regional asymmetry, visceral fat, bone density), RMR, VO₂ Max, lab panels when shared, plus client-stated goals, weekly time budget, support preference, and location. Re-ranks automatically after every retest.</div>
+        </details>
+        <details>
+          <summary>How does DexaFit benefit?</summary>
+          <div class="ans">Three revenue lines: partner referral fees, exclusive member-rate retest packages, and upgraded recurring memberships. Plus the retention moat — clients who pair a scan with a pathway return 3× more often than scan-only clients.</div>
+        </details>
+        <details>
+          <summary>Is supplement recommendation regulated-safe?</summary>
+          <div class="ans">All supplement recommendations are framed as audits delivered by licensed pharmacists or RDs, with sourcing and disclaimers. No DexaFit-branded SKU push, no commissions on individual supplements — the value sits in the audit itself.</div>
+        </details>
+        <details>
+          <summary>Can clients opt out of partner matching?</summary>
+          <div class="ans">Yes. The Hub also offers a self-guided track with progress templates and a pre-booked retest. Matching is a feature, not a paywall — the report itself is always accessible.</div>
+        </details>
+      </div>
+    </section>
+
+    <!-- FINAL CTA -->
+    <section class="cta-final" id="cta">
+      <h2>Stop selling scans. Start selling outcomes.</h2>
+      <p>The Wellness Hub is the bridge between DexaFit's data credibility and the transformation clients actually came for. It's the next product, not just the next page.</p>
+      <div class="cta-row">
+        <a class="btn primary" href="#assessment">Try the demo</a>
+        <a class="btn secondary" href="#partners">Browse partners</a>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <div class="footer">
+      <div class="brand"><div class="mark">D</div> DexaFit Wellness Hub · Concept</div>
+      <div>Built as a concept submission · 2026</div>
+    </div>
+  </div>
+
+  <!-- AI CHAT WIDGET -->
+  <button class="chat-fab" id="chatFab" onclick="toggleChat()"><span class="pulse"></span>Ask the Hub AI</button>
+  <div class="chat-panel" id="chatPanel">
+    <div class="chat-head">
+      <div><b>Hub AI</b><small>Trained on your scan results</small></div>
+      <button class="x" onclick="toggleChat()">×</button>
+    </div>
+    <div class="chat-body" id="chatBody">
+      <div class="msg bot">Hi! I can translate your scan into a plan. Try: <i>"How do I gain lean mass?"</i> or <i>"What should I eat?"</i></div>
+    </div>
+    <form class="chat-input" onsubmit="sendChat(event)">
+      <input id="chatInput" placeholder="Ask about your scan…" autocomplete="off"/>
+      <button type="submit">Send</button>
+    </form>
+  </div>
+
+  <!-- BOOKING MODAL -->
+  <div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+    <div class="modal" id="modal">
+      <button class="close" onclick="closeModal()">×</button>
+      <div id="modalContent">
+        <h3 id="modalTitle">Book consult</h3>
+        <p id="modalSub">Confirm your details and we'll reserve a 30-minute consult. No charge until you confirm.</p>
+        <form onsubmit="submitBooking(event)">
+          <input type="text" placeholder="Full name" required/>
+          <input type="email" placeholder="Email" required/>
+          <select required>
+            <option value="">Preferred time</option>
+            <option>This week · Morning</option>
+            <option>This week · Evening</option>
+            <option>Next week · Morning</option>
+            <option>Next week · Evening</option>
+          </select>
+          <button type="submit" class="btn primary">Reserve consult</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------- Filter sidebar ----------
+    document.querySelectorAll('.filter').forEach(f => {
+      f.addEventListener('click', () => {
+        document.querySelectorAll('.filter').forEach(x => x.classList.remove('active'));
+        f.classList.add('active');
+        const cat = f.dataset.filter;
+        document.querySelectorAll('#recList .recommend').forEach(r => {
+          const cats = (r.dataset.cat || '').split(',');
+          const show = cat === 'all' || cats.includes(cat);
+          r.style.display = show ? '' : 'none';
+        });
+      });
+    });
+
+    // ---------- Assessment ----------
+    const answers = { goal:'recomp', time:'mid', support:'hands' };
+    const pathways = {
+      recomp:   { title:'12-week body recomposition track', desc:'Strength training calibrated to your lean mass + nutrition built from your measured RMR. Pairs you with a coach for weekly check-ins and a retest at week 12.', match:94,
+                  rec:[['M','Coach Maya · Strength','3× weekly · Recomp specialist'],['N','Nutritionist Priya','RMR-calibrated meal plan'],['D','Retest DEXA at week 12','Pre-booked · 20% member rate']] },
+      fatloss:  { title:'6-week metabolic reset', desc:'Targeted at reducing visceral fat with structured cardio, time-restricted eating, and weekly accountability. Measured by retest, not by scale.', match:88,
+                  rec:[['Z','Coach Zane · Metabolic','Cardio + nutrition combo'],['N','Nutritionist Priya','Visceral-fat protocol'],['D','Retest DEXA at week 6','Track visceral change']] },
+      endurance:{ title:'8-week zone-based endurance plan', desc:'VO₂ Max becomes weekly zone targets, paced workouts, and recovery windows. Built for runners, cyclists, and hybrid athletes.', match:91,
+                  rec:[['J','Coach Jordan · Endurance','USAT-certified, remote OK'],['L','PT Lena Ortiz','Recovery + mobility'],['V','VO₂ retest at week 8','Track ml/kg improvement']] },
+      longevity:{ title:'Longevity lab + lifestyle plan', desc:'Combine labs, RMR, and DEXA into a longevity-focused plan: training, supplements, sleep, and quarterly retests.', match:86,
+                  rec:[['A','Dr. Aaron · Supplement audit','Evidence-first review'],['P','Nutritionist Priya','Anti-inflammatory diet'],['Q','Quarterly retest pack','4 scans · save 25%']] }
+    };
+    const timeBoost = { low:-4, mid:0, high:+3, flex:-1 };
+    const supportBoost = { hands:+3, self:-2, hybrid:0, group:+1 };
+
+    function updateAssess(){
+      const p = pathways[answers.goal];
+      const match = Math.max(60, Math.min(99, p.match + (timeBoost[answers.time]||0) + (supportBoost[answers.support]||0)));
+      document.getElementById('resultTitle').textContent = p.title;
+      document.getElementById('resultDesc').textContent = p.desc;
+      document.getElementById('matchPct').textContent = match;
+      document.getElementById('progBar').style.width = match + '%';
+      p.rec.forEach((r,i)=>{
+        document.querySelector('.mini-rec:nth-of-type('+(i+1)+') .dot').textContent = r[0];
+        document.getElementById('rec'+(i+1)+'Name').textContent = r[1];
+        document.getElementById('rec'+(i+1)+'Tag').textContent = r[2];
+      });
+    }
+    document.querySelectorAll('.opts').forEach(group => {
+      group.querySelectorAll('.opt').forEach(btn => {
+        btn.addEventListener('click', () => {
+          group.querySelectorAll('.opt').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          answers[group.dataset.q] = btn.dataset.val;
+          updateAssess();
+        });
+      });
+    });
+
+    // ---------- Modal ----------
+    function openModal(title){
+      document.getElementById('modalTitle').textContent = 'Book · ' + title;
+      document.getElementById('modalSub').textContent = "Confirm your details and we'll reserve a 30-minute consult. No charge until you confirm.";
+      document.getElementById('modalBg').classList.add('open');
+    }
+    function closeModal(){
+      document.getElementById('modalBg').classList.remove('open');
+      document.getElementById('modalContent').innerHTML = document.getElementById('modalContent').dataset.initial || document.getElementById('modalContent').innerHTML;
+    }
+    function submitBooking(e){
+      e.preventDefault();
+      document.getElementById('modalContent').innerHTML = '<div class="success"><div class="check">✓</div><h3>You\'re booked.</h3><p>We\'ve sent a calendar invite and your scan summary to the provider. They\'ll reach out within 24 hours.</p><button class="btn primary" onclick="closeModal()">Done</button></div>';
+    }
+    document.getElementById('modalContent').dataset.initial = document.getElementById('modalContent').innerHTML;
+
+    // ---------- Chat ----------
+    function toggleChat(){ document.getElementById('chatPanel').classList.toggle('open'); }
+    const replies = [
+      { k:['lean','muscle','mass','strength'], a:"Your DEXA shows lean mass is 62% of goal. Best path: 3× weekly strength + 1.6 g/kg protein, calibrated to your 2,040 kcal RMR. I'd match you with Coach Maya — want me to open her booking?" },
+      { k:['eat','food','nutrition','diet','meal','calorie'], a:"Your RMR is 2,040 kcal — for recomp I'd target ~2,300 kcal on training days, ~2,000 on rest days, with 150g+ protein. Nutritionist Priya builds plans from RMR directly. Open her booking?" },
+      { k:['cardio','vo2','endurance','run','ride'], a:"VO₂ Max of 38.4 puts you in the base phase. I'd add 2 zone-2 sessions and 1 interval session weekly. Coach Jordan does this remotely. Shall I book a consult?" },
+      { k:['visceral','fat','belly'], a:"Your visceral fat is 0.9 lb — within range but worth watching. The 6-week metabolic reset is the most direct path. Should I show it?" },
+      { k:['retest','scan','dexa'], a:"For your goal, a retest at week 12 is ideal — it gives lean mass enough time to show measurable change. I can pre-book at the member rate (20% off). Want me to schedule it?" },
+      { k:['supplement','vitamin','protein'], a:"Before adding anything: book a 30-min audit with Dr. Aaron, PharmD. He'll review your stack against your labs — no upsells, just clear answers." },
+      { k:['hi','hello','hey'], a:"Hey! Ask me anything about your scan or what to do next — I'll pull from your DEXA, RMR, and VO₂ results." }
+    ];
+    function botReply(t){
+      const q = t.toLowerCase();
+      for(const r of replies){ if(r.k.some(k=>q.includes(k))) return r.a; }
+      return "I can help with lean mass, nutrition, VO₂ Max, visceral fat, retest timing, or supplements — try one of those topics?";
+    }
+    function sendChat(e){
+      e.preventDefault();
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if(!text) return;
+      const body = document.getElementById('chatBody');
+      const u = document.createElement('div'); u.className='msg user'; u.textContent = text; body.appendChild(u);
+      input.value=''; body.scrollTop = body.scrollHeight;
+      setTimeout(()=>{
+        const b = document.createElement('div'); b.className='msg bot'; b.textContent = botReply(text); body.appendChild(b);
+        body.scrollTop = body.scrollHeight;
+      }, 450);
+    }
+  </script>
+</body>
+</html>
