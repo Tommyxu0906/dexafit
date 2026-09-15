@@ -30,8 +30,12 @@ npm run dev        # dev server
 npm run build      # production build
 npm run typecheck  # tsc --noEmit
 npm run lint       # eslint
-npm test           # vitest
+npm test           # vitest — rules engine and server actions
+npm run test:db    # psql — RLS and column authorization (needs PG* env or a connection string)
 ```
+
+Before merging, work through [docs/smoke-test.md](docs/smoke-test.md): the
+database layer is regression-tested but the browser flow is not.
 
 ## Structure
 
@@ -55,3 +59,10 @@ UI must never present it as one. See `legalRequirement` / `marketplaceRequiremen
 **Jurisdiction is always `(country, state)`.** There are no `ma_*` columns. Adding a state
 means adding rules to `RESEARCHED_JURISDICTIONS` and the requirements config — not
 touching the schema or the wizard.
+
+**Authorization is enforced in the database, not in the UI.** RLS decides which rows a
+user reaches; the triggers in `0004_column_authorization.sql` decide which *columns* they
+may write. A professional can only move themselves down the privilege ladder — never set
+their own credential to verified, their own application to approved, or their own listing
+to active. Keep new reviewer-owned columns covered by those triggers, and keep
+`supabase/tests/security.sql` passing.
