@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { DocumentUpload } from "@/components/document-upload";
+import { DocumentUpload, type UploadedDocument } from "@/components/document-upload";
 import {
   Badge,
   Button,
@@ -191,6 +191,9 @@ function InsuranceForm({
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState(saveInsurance, idleState);
+  const [certificate, setCertificate] = useState<UploadedDocument | null>(
+    document ? { id: document.id, original_filename: document.original_filename } : null,
+  );
   const errors = state.fieldErrors ?? {};
   const key = policy?.id ?? "new";
 
@@ -284,11 +287,8 @@ function InsuranceForm({
             name="certificateDocumentId"
             documentType="INSURANCE_CERTIFICATE"
             required
-            existing={
-              document
-                ? { id: document.id, original_filename: document.original_filename }
-                : null
-            }
+            value={certificate}
+            onChange={setCertificate}
           />
         </Field>
       </div>
@@ -321,6 +321,9 @@ function DisclosureQuestion({
   error?: string;
 }) {
   const [answer, setAnswer] = useState(existing?.answer ?? false);
+  const [supporting, setSupporting] = useState<UploadedDocument | null>(
+    document ? { id: document.id, original_filename: document.original_filename } : null,
+  );
 
   return (
     <div className="rounded-xl border border-line p-4">
@@ -365,11 +368,8 @@ function DisclosureQuestion({
             <DocumentUpload
               name={`${type}.documentId`}
               documentType="COMPLIANCE_SUPPORTING"
-              existing={
-                document
-                  ? { id: document.id, original_filename: document.original_filename }
-                  : null
-              }
+              value={supporting}
+              onChange={setSupporting}
             />
           </Field>
         </div>

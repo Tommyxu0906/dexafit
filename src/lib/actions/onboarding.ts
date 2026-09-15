@@ -198,7 +198,7 @@ export async function saveCredential(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
-  const { professionalId, application } = await getOnboardingContext();
+  const { professionalId, profile, application } = await getOnboardingContext();
 
   const parsed = credentialSchema.safeParse({
     id: formString(formData.get("id")),
@@ -218,6 +218,24 @@ export async function saveCredential(
   }
 
   const value = parsed.data;
+
+  // Refuse to store a credential that is missing documentation it requires.
+  // Saving it anyway strands the uploaded file with nothing pointing at it and
+  // hides the problem until the final submit.
+  if (profile.profession_type) {
+    const requirement = getRequirements(
+      profile.profession_type,
+      formString(formData.get("jurisdictionState")) ?? value.jurisdictionState ?? "MA",
+    ).credentials.find((c) => c.credentialType === value.credentialType);
+
+    if (requirement?.requiresDocument && !value.documentId) {
+      return failure(
+        "Attach the supporting document before saving this credential.",
+        { documentId: "Upload a file" },
+      );
+    }
+  }
+
   const supabase = await createClient();
 
   const payload = {
@@ -909,13 +927,22 @@ export async function submitApplication(
 
   if (error) return failure(error.message);
 
-  await supabase.from("application_review_events").insert({
-    application_id: application.id,
-    event_type: "SUBMITTED",
-    from_status: application.status,
-    to_status: "SUBMITTED",
-    note: manualReview ? "Flagged for manual review on submission." : null,
-  });
+  const { error: auditError } = await supabase
+    .from("application_review_events")
+    .insert({
+      application_id: application.id,
+      event_type: "SUBMITTED",
+      from_status: application.status,
+      to_status: "SUBMITTED",
+      note: manualReview ? "Flagged for manual review on submission." : null,
+    });
+
+  // A dropped audit write is not worth failing a submission over, but it must
+  // never pass unnoticed the way it did when the insert policy silently rejected
+  // this event.
+  if (auditError) {
+    console.error("Failed to record submission in the audit trail:", auditError);
+  }
 
   revalidateOnboarding();
   redirect(`${ONBOARDING_BASE}/status`);

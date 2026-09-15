@@ -3,29 +3,36 @@
 import { useRef, useState } from "react";
 import type { DocumentType } from "@/lib/domain/enums";
 
-type UploadedDocument = {
+export type UploadedDocument = {
   id: string;
   original_filename: string;
 };
 
 /**
- * Uploads to the private document bucket and writes the resulting document id
- * into a hidden input, so the enclosing form submits an id rather than a file.
+ * Uploads to the private document bucket and reports the stored document back to
+ * the form that owns it.
+ *
+ * The uploaded id is deliberately held by the parent rather than inside this
+ * component. When it lived here, anything that remounted the component — a
+ * sibling list re-rendering, a form collapsing and reopening — silently reset it
+ * to null while the form still submitted happily, so the file landed in storage
+ * with nothing pointing at it.
  */
 export function DocumentUpload({
   name,
   documentType,
   required,
-  existing,
+  value,
+  onChange,
   label = "Upload file",
 }: {
   name: string;
   documentType: DocumentType;
   required?: boolean;
-  existing?: UploadedDocument | null;
+  value: UploadedDocument | null;
+  onChange: (document: UploadedDocument | null) => void;
   label?: string;
 }) {
-  const [document, setDocument] = useState<UploadedDocument | null>(existing ?? null);
   const [status, setStatus] = useState<"idle" | "uploading" | "error">("idle");
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -54,39 +61,39 @@ export function DocumentUpload({
       return;
     }
 
-    setDocument(payload.document);
+    onChange(payload.document as UploadedDocument);
     setStatus("idle");
   }
 
   async function handleView() {
-    if (!document) return;
-    const response = await fetch(`/api/documents/${document.id}`);
+    if (!value) return;
+    const response = await fetch(`/api/documents/${value.id}`);
     const payload = await response.json();
     if (response.ok) window.open(payload.url, "_blank", "noopener,noreferrer");
   }
 
   return (
     <div className="flex flex-col gap-2">
-      <input type="hidden" name={name} value={document?.id ?? ""} />
+      <input type="hidden" name={name} value={value?.id ?? ""} readOnly />
       <div className="flex flex-wrap items-center gap-3">
         <label className="inline-flex cursor-pointer items-center rounded-xl border border-line bg-white px-3.5 py-2 text-sm font-semibold text-ink hover:bg-slate-50">
-          {status === "uploading" ? "Uploading…" : document ? "Replace file" : label}
+          {status === "uploading" ? "Uploading…" : value ? "Replace file" : label}
           <input
             ref={inputRef}
             type="file"
             accept="application/pdf,image/jpeg,image/png,image/webp"
             className="sr-only"
             onChange={handleChange}
-            required={required && !document}
+            required={required && !value}
           />
         </label>
-        {document ? (
+        {value ? (
           <button
             type="button"
             onClick={handleView}
             className="text-sm font-medium text-emerald-700 underline underline-offset-2"
           >
-            {document.original_filename}
+            {value.original_filename}
           </button>
         ) : (
           <span className="text-xs text-muted">PDF, JPG, PNG or WebP · max 10 MB</span>

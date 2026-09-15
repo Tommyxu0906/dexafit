@@ -52,8 +52,6 @@ export function PracticeForm({
 
   const errors = state.fieldErrors ?? {};
   const isOrganization = joiningAs !== "INDIVIDUAL";
-  const needsAddress =
-    serviceModes.includes("IN_PERSON") || serviceModes.includes("HYBRID");
 
   function toggleMode(mode: ServiceMode, checked: boolean) {
     setServiceModes((current) =>
@@ -175,8 +173,13 @@ export function PracticeForm({
           </div>
         </Field>
 
-        {needsAddress ? (
-          <div className="mt-5 grid gap-5 sm:grid-cols-2">
+        <div className="mt-5">
+          <p className="text-sm font-semibold text-ink">Business address</p>
+          <p className="mt-1 mb-4 text-xs text-muted">
+            Required for every provider, including virtual-only. We use it to verify
+            your identity and for legal contact — it is not shown to customers.
+          </p>
+          <div className="grid gap-5 sm:grid-cols-2">
             <Field label="Address line 1" htmlFor="businessAddress1" required error={errors.businessAddress1}>
               <Input
                 id="businessAddress1"
@@ -211,7 +214,7 @@ export function PracticeForm({
               />
             </Field>
           </div>
-        ) : null}
+        </div>
 
         <input type="hidden" name="country" value={DEFAULT_COUNTRY} />
 

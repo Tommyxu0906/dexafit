@@ -149,6 +149,28 @@ select assert(
   (select count(*) from application_review_events where note = 'forged') = 0,
   'provider cannot forge a review event');
 
+-- A provider still causes two events of their own, and the audit trail has to
+-- keep them. Restricting forgery once cost us the submission record entirely.
+insert into application_review_events (application_id, event_type, from_status, to_status, note)
+values ('3333aaaa-0000-4000-8000-000000000001', 'SUBMITTED', 'DRAFT', 'SUBMITTED',
+        'provider submitted');
+select assert(
+  (select count(*) from application_review_events where event_type = 'SUBMITTED') = 1,
+  'provider can record their own submission');
+
+do $$
+begin
+  insert into application_review_events (application_id, event_type, to_status, note, actor_id)
+  values ('3333aaaa-0000-4000-8000-000000000001', 'SUBMITTED', 'SUBMITTED', 'self-attributed',
+          auth.uid());
+exception when insufficient_privilege then
+  null;
+end;
+$$;
+select assert(
+  (select count(*) from application_review_events where note = 'self-attributed') = 0,
+  'provider cannot name themselves as the actor on an event');
+
 -- ---------------------------------------------------------------------------
 -- Tenant isolation
 -- ---------------------------------------------------------------------------

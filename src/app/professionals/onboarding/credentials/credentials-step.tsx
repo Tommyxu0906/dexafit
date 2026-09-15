@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { DocumentUpload } from "@/components/document-upload";
+import { DocumentUpload, type UploadedDocument } from "@/components/document-upload";
 import {
   Badge,
   Button,
@@ -410,6 +410,9 @@ function CredentialForm({
   onDone: () => void;
 }) {
   const [state, formAction, pending] = useActionState(saveCredential, idleState);
+  const [attachment, setAttachment] = useState<UploadedDocument | null>(
+    document ? { id: document.id, original_filename: document.original_filename } : null,
+  );
   const errors = state.fieldErrors ?? {};
 
   useEffect(() => {
@@ -508,16 +511,13 @@ function CredentialForm({
 
       {requirement.requiresDocument ? (
         <div className="mt-4">
-          <Field label="Documentation" required>
+          <Field label="Documentation" required error={errors.documentId}>
             <DocumentUpload
               name="documentId"
               documentType="CREDENTIAL"
               required
-              existing={
-                document
-                  ? { id: document.id, original_filename: document.original_filename }
-                  : null
-              }
+              value={attachment}
+              onChange={setAttachment}
             />
           </Field>
         </div>

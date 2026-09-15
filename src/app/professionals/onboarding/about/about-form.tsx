@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
-import { DocumentUpload } from "@/components/document-upload";
+import { useActionState, useState } from "react";
+import { DocumentUpload, type UploadedDocument } from "@/components/document-upload";
 import {
   Button,
   Callout,
@@ -27,6 +27,7 @@ export function AboutForm({
   photo: { id: string; original_filename: string } | null;
 }) {
   const [state, formAction, pending] = useActionState(saveAboutYou, idleState);
+  const [photoDocument, setPhotoDocument] = useState<UploadedDocument | null>(photo);
   const errors = state.fieldErrors ?? {};
 
   return (
@@ -172,7 +173,9 @@ export function AboutForm({
             <DocumentUpload
               name="profilePhotoDocumentId"
               documentType="PROFILE_PHOTO"
-              existing={photo}
+              required
+              value={photoDocument}
+              onChange={setPhotoDocument}
               label="Upload photo"
             />
           </Field>

@@ -9,21 +9,35 @@ import {
   SERVICE_MODES,
 } from "./enums";
 
-const optionalText = z
-  .string()
-  .trim()
-  .max(500)
-  .optional()
-  .transform((v) => (v === "" ? undefined : v));
+/**
+ * A field the wizard renders conditionally is absent from the submitted form,
+ * and `FormData.get` reports absence as `null` rather than `undefined`. Treat
+ * both — and the empty string — as "not provided", or hiding a field turns into
+ * a validation error the user cannot see or fix.
+ */
+const absentToUndefined = (value: unknown) =>
+  value === null || value === "" ? undefined : value;
 
-const optionalUrl = z
-  .string()
-  .trim()
-  .optional()
-  .transform((v) => (v === "" ? undefined : v))
-  .refine((v) => v === undefined || z.string().url().safeParse(v).success, {
-    message: "Must be a valid URL",
-  });
+const optionalText = z.preprocess(
+  absentToUndefined,
+  z.string().trim().max(500).optional(),
+);
+
+const optionalUrl = z.preprocess(
+  absentToUndefined,
+  z.string().trim().url("Must be a valid URL").optional(),
+);
+
+/**
+ * Absent becomes the empty string rather than undefined, so a missing field
+ * fails on `min(1)` with the message written for a human instead of Zod's
+ * "expected string, received undefined".
+ */
+const requiredText = (message: string) =>
+  z.preprocess(
+    (value) => (value === null || value === undefined ? "" : value),
+    z.string().trim().min(1, message).max(500),
+  );
 
 /** Loose E.164-ish check; normalization happens before persistence. */
 const phone = z
@@ -64,11 +78,14 @@ export const practiceSchema = z
     businessEmail: z.string().trim().email("Enter a valid email"),
     businessPhone: phone,
     businessWebsite: optionalUrl,
-    businessAddress1: optionalText,
+    // A business address is required of every provider, including virtual-only
+    // ones: it is what identity verification, legal contact and dispute handling
+    // rest on, and step 7 covers service geography separately.
+    businessAddress1: requiredText("Required"),
     businessAddress2: optionalText,
-    city: optionalText,
-    state: optionalText,
-    postalCode: optionalText,
+    city: requiredText("Required"),
+    state: requiredText("Select a state"),
+    postalCode: requiredText("Required"),
     country: z.string().trim().min(2).max(2),
     serviceModes: z.array(z.enum(SERVICE_MODES)).min(1, "Select at least one"),
     acceptingNewClients: z.boolean(),
@@ -81,20 +98,6 @@ export const practiceSchema = z
         path: ["organizationLegalName"],
         message: "Required when joining as part of an organization",
       });
-    }
-    // A physical address is only meaningful when in-person care is offered.
-    const inPerson =
-      value.serviceModes.includes("IN_PERSON") || value.serviceModes.includes("HYBRID");
-    if (inPerson) {
-      for (const field of ["businessAddress1", "city", "state", "postalCode"] as const) {
-        if (!value[field]) {
-          ctx.addIssue({
-            code: "custom",
-            path: [field],
-            message: "Required for in-person services",
-          });
-        }
-      }
     }
   });
 
