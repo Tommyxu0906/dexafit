@@ -33,7 +33,7 @@ exactly once.
 
 | # | File | What it creates |
 |---|------|-----------------|
-| 1 | `supabase/migrations/0001_professional_onboarding.sql` | 17 tables, constraints, `updated_at` triggers |
+| 1 | `supabase/migrations/0001_professional_onboarding.sql` | 16 tables, constraints, `updated_at` triggers |
 | 2 | `supabase/migrations/0002_rls.sql` | RLS policies, private storage bucket |
 | 3 | `supabase/migrations/0003_seed_capabilities.sql` | capability reference data |
 | 4 | `supabase/migrations/0004_column_authorization.sql` | column-level authorization triggers |

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createClient } from "../supabase/server";
 import type {
   ApplicationBundle,
@@ -5,55 +6,94 @@ import type {
   ProfessionalProfileRow,
 } from "./types";
 
+/** Postgres unique_violation. */
+const UNIQUE_VIOLATION = "23505";
+
 /**
  * Resolves the signed-in user's professional profile, creating the draft profile
  * and application on first visit. The professional id is always derived from the
  * session, never accepted from the client.
+ *
+ * Wrapped in `cache` so a layout and the page it wraps share one lookup instead
+ * of racing each other to create the same row on a first visit. The unique
+ * violations are still handled below, because concurrent requests (two tabs, a
+ * double submit) can race outside a single render pass.
  */
-export async function getOrCreateProfessional(userId: string): Promise<{
-  profile: ProfessionalProfileRow;
-  application: ApplicationRow;
-}> {
-  const supabase = await createClient();
+export const getOrCreateProfessional = cache(
+  async (
+    userId: string,
+  ): Promise<{ profile: ProfessionalProfileRow; application: ApplicationRow }> => {
+    const supabase = await createClient();
 
-  const { data: existing } = await supabase
-    .from("professional_profiles")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
+    const selectProfile = async () =>
+      (
+        await supabase
+          .from("professional_profiles")
+          .select("*")
+          .eq("user_id", userId)
+          .maybeSingle()
+      ).data as ProfessionalProfileRow | null;
 
-  let profile = existing as ProfessionalProfileRow | null;
+    let profile = await selectProfile();
 
-  if (!profile) {
-    const { data, error } = await supabase
-      .from("professional_profiles")
-      .insert({ user_id: userId })
-      .select("*")
-      .single();
-    if (error) throw new Error(`Could not create professional profile: ${error.message}`);
-    profile = data as ProfessionalProfileRow;
-  }
+    if (!profile) {
+      const { data, error } = await supabase
+        .from("professional_profiles")
+        .insert({ user_id: userId })
+        .select("*")
+        .single();
 
-  const { data: existingApp } = await supabase
-    .from("professional_applications")
-    .select("*")
-    .eq("professional_id", profile.id)
-    .maybeSingle();
+      if (error) {
+        // Someone else created it between our select and insert; theirs is as
+        // good as ours.
+        if (error.code !== UNIQUE_VIOLATION) {
+          throw new Error(`Could not create professional profile: ${error.message}`);
+        }
+        profile = await selectProfile();
+        if (!profile) {
+          throw new Error("Could not load professional profile after a concurrent create.");
+        }
+      } else {
+        profile = data as ProfessionalProfileRow;
+      }
+    }
 
-  let application = existingApp as ApplicationRow | null;
+    const professionalId = profile.id;
 
-  if (!application) {
-    const { data, error } = await supabase
-      .from("professional_applications")
-      .insert({ professional_id: profile.id })
-      .select("*")
-      .single();
-    if (error) throw new Error(`Could not create application: ${error.message}`);
-    application = data as ApplicationRow;
-  }
+    const selectApplication = async () =>
+      (
+        await supabase
+          .from("professional_applications")
+          .select("*")
+          .eq("professional_id", professionalId)
+          .maybeSingle()
+      ).data as ApplicationRow | null;
 
-  return { profile, application };
-}
+    let application = await selectApplication();
+
+    if (!application) {
+      const { data, error } = await supabase
+        .from("professional_applications")
+        .insert({ professional_id: professionalId })
+        .select("*")
+        .single();
+
+      if (error) {
+        if (error.code !== UNIQUE_VIOLATION) {
+          throw new Error(`Could not create application: ${error.message}`);
+        }
+        application = await selectApplication();
+        if (!application) {
+          throw new Error("Could not load application after a concurrent create.");
+        }
+      } else {
+        application = data as ApplicationRow;
+      }
+    }
+
+    return { profile, application };
+  },
+);
 
 /** Full application graph. RLS restricts this to the owner or an admin. */
 export async function getApplicationBundle(
