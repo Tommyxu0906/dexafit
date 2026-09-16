@@ -36,6 +36,10 @@ export default async function AdminProfessionalsPage() {
          profession_type, marketplace_status
        )`,
     )
+    // A draft has not been submitted to anyone, so it is not review work. It
+    // also keeps a reviewer's own account out of their queue: signing in lands
+    // on the provider wizard, which opens a draft for whoever arrives.
+    .neq("status", "DRAFT")
     .order("submitted_at", { ascending: false, nullsFirst: false });
 
   const rows = (applications ?? []) as unknown as QueueRow[];
@@ -60,14 +64,15 @@ export default async function AdminProfessionalsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Professionals</h1>
         <p className="mt-1 text-sm text-muted">
-          {rows.length} application{rows.length === 1 ? "" : "s"} in the queue.
+          {rows.length} submitted application{rows.length === 1 ? "" : "s"}. Drafts are
+          not shown until the professional submits them.
         </p>
       </div>
 
       <Card className="overflow-x-auto p-0">
         {rows.length === 0 ? (
           <div className="p-6">
-            <EmptyState>No applications yet.</EmptyState>
+            <EmptyState>No submitted applications yet.</EmptyState>
           </div>
         ) : (
           <table className="w-full min-w-3xl text-left text-sm">

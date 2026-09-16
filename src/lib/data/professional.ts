@@ -5,8 +5,6 @@ import type {
   ProfessionalProfileRow,
 } from "./types";
 
-/** Postgres unique_violation. */
-const UNIQUE_VIOLATION = "23505";
 
 /**
  * Resolves the signed-in user's professional profile, creating the draft profile
@@ -14,84 +12,52 @@ const UNIQUE_VIOLATION = "23505";
  * session, never accepted from the client.
  *
  * A layout and the page it wraps both call this and render concurrently, so on a
- * first visit they race to create the same row. Deliberately NOT wrapped in
- * React `cache`: a server action and the re-render it triggers share one request,
- * so a memoized read would hand the re-render the pre-action snapshot and the
- * wizard would show stale progress. The unique violation below is the safe way to
- * settle the race.
+ * first visit they race to create the same row. Both upserts below settle that in
+ * the database — `insert ... on conflict do update ... returning` either creates
+ * the row or hands back the one the other request just committed, in a single
+ * statement. Reading first and inserting second cannot be made correct here: the
+ * loser of the race has to re-read, and a re-read that comes back empty leaves
+ * nothing sensible to do.
+ *
+ * Only `user_id` / `professional_id` are sent, so the conflict branch rewrites
+ * the key to itself and every other column on an existing row is left alone.
  */
 export async function getOrCreateProfessional(
   userId: string,
 ): Promise<{ profile: ProfessionalProfileRow; application: ApplicationRow }> {
   const supabase = await createClient();
 
-  const selectProfile = async () =>
-    (
-      await supabase
-        .from("professional_profiles")
-        .select("*")
-        .eq("user_id", userId)
-        .maybeSingle()
-    ).data as ProfessionalProfileRow | null;
+  const { data: profile, error: profileError } = await supabase
+    .from("professional_profiles")
+    .upsert({ user_id: userId }, { onConflict: "user_id" })
+    .select("*")
+    .single();
 
-  let profile = await selectProfile();
-
-  if (!profile) {
-    const { data, error } = await supabase
-      .from("professional_profiles")
-      .insert({ user_id: userId })
-      .select("*")
-      .single();
-
-    if (error) {
-      // Someone else created it between our select and insert; theirs is as
-      // good as ours.
-      if (error.code !== UNIQUE_VIOLATION) {
-        throw new Error(`Could not create professional profile: ${error.message}`);
-      }
-      profile = await selectProfile();
-      if (!profile) {
-        throw new Error("Could not load professional profile after a concurrent create.");
-      }
-    } else {
-      profile = data as ProfessionalProfileRow;
-    }
+  if (profileError || !profile) {
+    throw new Error(
+      `Could not resolve professional profile: ${profileError?.message ?? "no row returned"}`,
+    );
   }
 
-  const professionalId = profile.id;
+  const { data: application, error: applicationError } = await supabase
+    .from("professional_applications")
+    .upsert(
+      { professional_id: profile.id },
+      { onConflict: "professional_id" },
+    )
+    .select("*")
+    .single();
 
-  const selectApplication = async () =>
-    (
-      await supabase
-        .from("professional_applications")
-        .select("*")
-        .eq("professional_id", professionalId)
-        .maybeSingle()
-    ).data as ApplicationRow | null;
-
-  let application = await selectApplication();
-
-  if (!application) {
-    const { data, error } = await supabase
-      .from("professional_applications")
-      .insert({ professional_id: professionalId })
-      .select("*")
-      .single();
-
-    if (error) {
-      if (error.code !== UNIQUE_VIOLATION) {
-        throw new Error(`Could not create application: ${error.message}`);
-      }
-      application = await selectApplication();
-      if (!application) {
-        throw new Error("Could not load application after a concurrent create.");
-      }
-    } else {
-      application = data as ApplicationRow;
-    }
+  if (applicationError || !application) {
+    throw new Error(
+      `Could not resolve application: ${applicationError?.message ?? "no row returned"}`,
+    );
   }
 
-  return { profile, application };
+  return {
+    profile: profile as ProfessionalProfileRow,
+    application: application as ApplicationRow,
+  };
 }
 
 /** Full application graph. RLS restricts this to the owner or an admin. */
@@ -144,6 +110,34 @@ export async function getApplicationBundle(
     supabase.from("professional_capabilities").select("*").eq("professional_id", professionalId),
     supabase.from("attestations").select("*").eq("professional_id", professionalId),
   ]);
+
+  // A failed read must not read as "you have none of these". Showing an empty
+  // credential list because a query errored would tell a provider their uploads
+  // vanished, and would let readiness draw conclusions from data it never saw.
+  const failed = [
+    ["profile", profileRes],
+    ["application", applicationRes],
+    ["credentials", credentialsRes],
+    ["insurance", insuranceRes],
+    ["disclosures", disclosuresRes],
+    ["documents", documentsRes],
+    ["services", servicesRes],
+    ["locations", locationsRes],
+    ["jurisdictions", jurisdictionsRes],
+    ["capabilities", capabilitiesRes],
+    ["attestations", attestationsRes],
+  ].filter(([, res]) => (res as { error: unknown }).error) as [
+    string,
+    { error: { message: string } },
+  ][];
+
+  if (failed.length > 0) {
+    throw new Error(
+      `Could not load the application: ${failed
+        .map(([name, res]) => `${name} (${res.error.message})`)
+        .join(", ")}`,
+    );
+  }
 
   if (!profileRes.data || !applicationRes.data) return null;
 

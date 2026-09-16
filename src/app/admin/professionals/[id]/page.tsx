@@ -96,9 +96,17 @@ export default async function AdminProfessionalDetail({
       </div>
 
       {readiness.ready ? (
-        <Callout tone="success" title="Ready to approve">
-          Every credentialing rule passes for this application.
-        </Callout>
+        bundle.application.status === "APPROVED" ? (
+          <Callout tone="success" title="Approved">
+            Every credentialing rule passes. This professional is eligible for the
+            marketplace, and stays eligible only while these credentials remain
+            verified and unexpired.
+          </Callout>
+        ) : (
+          <Callout tone="success" title="Ready to approve">
+            Every credentialing rule passes for this application.
+          </Callout>
+        )
       ) : (
         <Callout tone="warning" title="Not ready to approve">
           <ul className="mt-1 flex flex-col gap-1">
