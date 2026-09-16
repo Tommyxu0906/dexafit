@@ -512,10 +512,18 @@ export async function saveComplianceStep(
   // Any yes answer routes the application to a human reviewer.
   const anyYes = parsed.data.disclosures.some((d) => d.answer);
   if (anyYes) {
-    await supabase
+    const { error: flagError } = await supabase
       .from("professional_applications")
       .update({ manual_review_required: true })
       .eq("id", application.id);
+
+    // A disclosed issue that never reaches a reviewer is the whole point of
+    // this step failing open.
+    if (flagError) {
+      return failure(
+        `Could not flag your disclosures for review: ${flagError.message}`,
+      );
+    }
   }
 
   await markStepComplete(application, "insurance");
@@ -724,18 +732,26 @@ export async function saveLocation(
         c.jurisdiction_state === value.state,
     );
 
-    await supabase.from("professional_service_jurisdictions").upsert(
-      {
-        professional_id: professionalId,
-        country: value.country,
-        state: value.state,
-        profession_type: profile.profession_type,
-        credential_id: licenseInState?.id ?? null,
-        virtual_allowed: value.serviceMode !== "IN_PERSON",
-        in_person_allowed: value.serviceMode !== "VIRTUAL",
-      },
-      { onConflict: "professional_id,country,state" },
-    );
+    const { error: jurisdictionError } = await supabase
+      .from("professional_service_jurisdictions")
+      .upsert(
+        {
+          professional_id: professionalId,
+          country: value.country,
+          state: value.state,
+          profession_type: profile.profession_type,
+          credential_id: licenseInState?.id ?? null,
+          virtual_allowed: value.serviceMode !== "IN_PERSON",
+          in_person_allowed: value.serviceMode !== "VIRTUAL",
+        },
+        { onConflict: "professional_id,country,state" },
+      );
+
+    if (jurisdictionError) {
+      return failure(
+        `Could not record where you are licensed to serve: ${jurisdictionError.message}`,
+      );
+    }
   }
 
   revalidateOnboarding();

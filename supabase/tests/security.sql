@@ -171,6 +171,29 @@ select assert(
   (select count(*) from application_review_events where note = 'self-attributed') = 0,
   'provider cannot name themselves as the actor on an event');
 
+-- Every review state a reopen can land on must be writable, or the edit
+-- disappears from the trail for that state only.
+insert into application_review_events (application_id, event_type, from_status, to_status, note)
+values ('3333aaaa-0000-4000-8000-000000000001', 'REOPENED_FOR_REVIEW', 'COMPLIANCE_REVIEW',
+        'COMPLIANCE_REVIEW', 'reopened from compliance review');
+select assert(
+  (select count(*) from application_review_events
+    where note = 'reopened from compliance review') = 1,
+  'provider can record a reopen while in compliance review');
+
+do $$
+begin
+  insert into application_review_events (application_id, event_type, to_status, note)
+  values ('3333aaaa-0000-4000-8000-000000000001', 'REOPENED_FOR_REVIEW', 'APPROVED',
+          'claims approval');
+exception when insufficient_privilege then
+  null;
+end;
+$$;
+select assert(
+  (select count(*) from application_review_events where note = 'claims approval') = 0,
+  'provider cannot record an event landing on APPROVED');
+
 -- ---------------------------------------------------------------------------
 -- Tenant isolation
 -- ---------------------------------------------------------------------------
@@ -287,7 +310,11 @@ select assert(
   'a post-approval edit reopens review and stands the listing down');
 
 select assert(
-  (select count(*) from application_review_events where event_type = 'REOPENED_FOR_REVIEW') = 1,
+  exists (
+    select 1 from application_review_events
+    where event_type = 'REOPENED_FOR_REVIEW'
+      and note = 'Credential updated after approval'
+  ),
   'the reopen event is recorded');
 
 update application_review_events set note = 'rewritten' where event_type = 'REOPENED_FOR_REVIEW';

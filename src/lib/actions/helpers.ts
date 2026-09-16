@@ -22,10 +22,14 @@ export async function markStepComplete(
 ): Promise<void> {
   if (application.completed_steps.includes(step)) return;
   const supabase = await createClient();
-  await supabase
+  const { error } = await supabase
     .from("professional_applications")
     .update({ completed_steps: [...application.completed_steps, step] })
     .eq("id", application.id);
+
+  if (error) {
+    console.error(`Could not record progress for step "${step}":`, error);
+  }
 }
 
 const POST_SUBMISSION_STATUSES = [
@@ -52,30 +56,49 @@ export async function reopenForReview(
   const supabase = await createClient();
 
   if (application.status === "APPROVED" || application.status === "NEEDS_INFORMATION") {
-    await supabase
+    const { error: statusError } = await supabase
       .from("professional_applications")
       .update({ status: "CREDENTIAL_REVIEW" })
       .eq("id", application.id);
 
-    // An approved professional cannot stay listed on unreviewed changes.
-    await supabase
+    // These two carry the guarantee that an approved listing cannot survive an
+    // unreviewed change. Failing them quietly would leave a professional on the
+    // marketplace on the strength of a credential they just replaced, so they
+    // throw rather than let the caller report success.
+    if (statusError) {
+      throw new Error(`Could not reopen the application for review: ${statusError.message}`);
+    }
+
+    const { error: listingError } = await supabase
       .from("professional_profiles")
       .update({ marketplace_status: "INACTIVE" })
       .eq("id", application.professional_id);
+
+    if (listingError) {
+      throw new Error(
+        `Could not stand the marketplace listing down: ${listingError.message}`,
+      );
+    }
   }
 
-  await supabase.from("application_review_events").insert({
-    application_id: application.id,
-    event_type: "REOPENED_FOR_REVIEW",
-    from_status: application.status,
-    to_status:
-      application.status === "APPROVED" || application.status === "NEEDS_INFORMATION"
-        ? "CREDENTIAL_REVIEW"
-        : application.status,
-    subject_table: subject?.table ?? null,
-    subject_id: subject?.id ?? null,
-    note,
-  });
+  const { error: auditError } = await supabase
+    .from("application_review_events")
+    .insert({
+      application_id: application.id,
+      event_type: "REOPENED_FOR_REVIEW",
+      from_status: application.status,
+      to_status:
+        application.status === "APPROVED" || application.status === "NEEDS_INFORMATION"
+          ? "CREDENTIAL_REVIEW"
+          : application.status,
+      subject_table: subject?.table ?? null,
+      subject_id: subject?.id ?? null,
+      note,
+    });
+
+  if (auditError) {
+    console.error("Could not record the reopen event in the audit trail:", auditError);
+  }
 }
 
 /**
@@ -84,7 +107,7 @@ export async function reopenForReview(
  */
 export async function resetCredentialVerification(credentialId: string): Promise<void> {
   const supabase = await createClient();
-  await supabase
+  const { error } = await supabase
     .from("credentials")
     .update({
       verification_status: "PENDING",
@@ -93,6 +116,12 @@ export async function resetCredentialVerification(credentialId: string): Promise
     })
     .eq("id", credentialId)
     .eq("verification_status", "VERIFIED");
+
+  // The database trigger enforces this too, but if the write fails here we must
+  // not report a successful edit of a credential that still reads as verified.
+  if (error) {
+    throw new Error(`Could not reset credential verification: ${error.message}`);
+  }
 }
 
 export function formBoolean(value: FormDataEntryValue | null): boolean {

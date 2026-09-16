@@ -24,7 +24,7 @@ async function recordEvent(params: {
   actorId: string;
 }) {
   const supabase = await createClient();
-  await supabase.from("application_review_events").insert({
+  const { error } = await supabase.from("application_review_events").insert({
     application_id: params.applicationId,
     event_type: params.eventType,
     from_status: params.fromStatus ?? null,
@@ -34,6 +34,10 @@ async function recordEvent(params: {
     note: params.note ?? null,
     actor_id: params.actorId,
   });
+
+  if (error) {
+    console.error(`Could not record "${params.eventType}" in the audit trail:`, error);
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -251,10 +255,18 @@ export async function decideApplication(
         ? "SUSPENDED"
         : "INACTIVE";
 
-  await supabase
+  const { error: listingError } = await supabase
     .from("professional_profiles")
     .update({ marketplace_status: marketplaceStatus })
     .eq("id", application.professional_id);
+
+  // A suspension that does not actually take the listing down, or an approval
+  // that never puts it up, must not be reported to the reviewer as done.
+  if (listingError) {
+    return failure(
+      `Application moved to ${nextStatus.replace(/_/g, " ").toLowerCase()}, but the marketplace listing could not be updated: ${listingError.message}`,
+    );
+  }
 
   await recordEvent({
     applicationId,
