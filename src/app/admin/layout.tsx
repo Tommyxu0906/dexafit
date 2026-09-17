@@ -20,7 +20,21 @@ export default async function AdminLayout({
               DexaFit Credentialing
             </span>
           </Link>
-          <span className="text-xs text-white/70">{admin.email}</span>
+          <div className="flex items-center gap-5">
+            <Link
+              href="/admin/professionals"
+              className="text-xs font-semibold text-white/80 hover:text-white"
+            >
+              Queue
+            </Link>
+            <Link
+              href="/admin/notifications"
+              className="text-xs font-semibold text-white/80 hover:text-white"
+            >
+              Notifications
+            </Link>
+            <span className="text-xs text-white/70">{admin.email}</span>
+          </div>
         </div>
       </header>
       <main className="mx-auto w-full max-w-7xl flex-1 px-6 py-8">{children}</main>

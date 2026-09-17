@@ -3,9 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { AGREEMENT_VERSION, ATTESTATION_TYPES } from "../domain/attestations";
 import { filterAllowedCapabilities } from "../domain/capabilities";
-import { DISCLOSURE_TYPES } from "../domain/enums";
+import { DISCLOSURE_TYPES, PROFESSION_LABELS } from "../domain/enums";
 import { getRequirements } from "../domain/requirements";
 import {
   aboutYouSchema,
@@ -20,6 +21,7 @@ import {
   serviceOfferingSchema,
 } from "../domain/schemas";
 import { getApplicationBundle, primaryJurisdiction } from "../data/professional";
+import { notifyAdminsOfSubmission } from "../email/notifications";
 import { createClient } from "../supabase/server";
 import {
   formBoolean,
@@ -952,12 +954,14 @@ export async function submitApplication(
     bundle.disclosures.some((d) => d.answer) ||
     (profile.profession_type === "PSYCHOLOGIST" && !profile.hsp_certified);
 
+  const submittedAt = new Date();
+
   const supabase = await createClient();
   const { error } = await supabase
     .from("professional_applications")
     .update({
       status: "SUBMITTED",
-      submitted_at: new Date().toISOString(),
+      submitted_at: submittedAt.toISOString(),
       manual_review_required: manualReview,
       completed_steps: Array.from(new Set([...application.completed_steps, "review"])),
     })
@@ -982,6 +986,30 @@ export async function submitApplication(
   if (auditError) {
     console.error("Failed to record submission in the audit trail:", auditError);
   }
+
+  // The application is stored. Notifying the credentialing admins runs after the
+  // response so a slow or broken mail provider can never delay or fail a
+  // submission — `after` still runs through the redirect below.
+  const notification = {
+    applicationId: application.id,
+    applicantName:
+      profile.display_name ||
+      [profile.legal_first_name, profile.legal_last_name].filter(Boolean).join(" ") ||
+      "A new applicant",
+    professionLabel: PROFESSION_LABELS[profile.profession_type],
+    jurisdictionState: jurisdiction,
+    contactEmail: profile.email,
+    submittedAt,
+    manualReviewRequired: manualReview,
+  };
+
+  after(async () => {
+    try {
+      await notifyAdminsOfSubmission(notification);
+    } catch (notifyError) {
+      console.error("Unexpected failure notifying admins of a submission:", notifyError);
+    }
+  });
 
   revalidateOnboarding();
   redirect(`${ONBOARDING_BASE}/status`);

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { requireAdmin } from "../auth";
 import { getApplicationBundle, primaryJurisdiction, toReadinessInput } from "../data/professional";
 import { computeReadiness } from "../domain/readiness";
+import { notifyAdminsOfSubmission } from "../email/notifications";
 import { createClient } from "../supabase/server";
 import { failure, success, type ActionState } from "./state";
 import { formString } from "./helpers";
@@ -324,4 +325,36 @@ export async function addAdminNote(
 
   revalidateAdmin(applicationId);
   return success("Note added.");
+}
+
+/**
+ * Sends one real notification to the configured admin recipients, so delivery
+ * can be confirmed without filling out the nine-step wizard — and re-confirmed
+ * after a sender domain or deployment changes.
+ */
+export async function sendTestNotification(
+  _prev: ActionState,
+  _formData: FormData,
+): Promise<ActionState> {
+  const admin = await requireAdmin();
+
+  const result = await notifyAdminsOfSubmission({
+    applicationId: "00000000-0000-0000-0000-000000000000",
+    applicantName: "Test Applicant",
+    professionLabel: "Personal trainer",
+    jurisdictionState: "MA",
+    contactEmail: admin.email,
+    submittedAt: new Date(),
+    manualReviewRequired: false,
+  });
+
+  if (result.status === "sent") {
+    return success(
+      `Sent. Check the configured inbox — the review link points at a placeholder id, so it will 404.`,
+    );
+  }
+  if (result.status === "skipped") {
+    return failure(`Nothing was sent. ${result.reason}`);
+  }
+  return failure(`The send failed: ${result.reason}`);
 }
