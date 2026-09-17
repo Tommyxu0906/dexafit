@@ -147,7 +147,7 @@ export function ApplicationDecision({
     <form action={formAction} className="flex flex-col gap-3">
       <input type="hidden" name="applicationId" value={applicationId} />
 
-      <Select name="stage" defaultValue={currentStatus} disabled>
+      <Select defaultValue={currentStatus} disabled aria-label="Current status">
         <option value={currentStatus}>
           Current: {currentStatus.replace(/_/g, " ").toLowerCase()}
         </option>

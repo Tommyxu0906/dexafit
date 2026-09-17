@@ -227,7 +227,10 @@ export const ALLOWED_CAPABILITIES_BY_PROFESSION: Record<
   NURSE_PRACTITIONER: CLINICAL_MEDICAL_SCOPE,
   PHYSICIAN_ASSISTANT: CLINICAL_MEDICAL_SCOPE,
 
-  OTHER: ["GENERAL_WELLNESS"],
+  // An unrecognised profession is always reviewed by hand, so the scope stays
+  // deliberately general — but it still needs one of each kind, or the provider
+  // reaches step 5 and cannot satisfy it.
+  OTHER: ["GENERAL_WELLNESS", "BEGINNERS", "GENERAL_LONGEVITY"],
 };
 
 export function allowedCapabilities(

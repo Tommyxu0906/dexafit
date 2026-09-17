@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireAdmin } from "../auth";
 import { getApplicationBundle, primaryJurisdiction, toReadinessInput } from "../data/professional";
 import { computeReadiness } from "../domain/readiness";
@@ -287,6 +288,21 @@ export async function decideApplication(
   });
 
   revalidateAdmin(applicationId);
+
+  // Approving, rejecting, suspending or handing the application back all end the
+  // reviewer's work on it, so return them to the queue with the outcome. The two
+  // stage moves keep them on the record they are still reading.
+  const CLOSES_THE_REVIEW = ["approve", "reject", "suspend", "request_info"];
+  if (CLOSES_THE_REVIEW.includes(decision)) {
+    const name =
+      bundle.profile.display_name ??
+      `${bundle.profile.legal_first_name ?? ""} ${bundle.profile.legal_last_name ?? ""}`.trim();
+
+    redirect(
+      `/admin/professionals?decided=${nextStatus}&name=${encodeURIComponent(name || "The applicant")}`,
+    );
+  }
+
   return success(`Application moved to ${nextStatus.replace(/_/g, " ").toLowerCase()}.`);
 }
 

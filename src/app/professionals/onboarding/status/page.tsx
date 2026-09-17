@@ -36,7 +36,7 @@ export default async function StatusPage() {
   );
 
   const supabase = await createClient();
-  const { data: events } = await supabase
+  const { data: events, error: eventsError } = await supabase
     .from("application_review_events")
     .select("*")
     .eq("application_id", application.id)
@@ -98,6 +98,14 @@ export default async function StatusPage() {
 
       <Card>
         <h2 className="text-sm font-bold text-ink">History</h2>
+        {eventsError ? (
+          <div className="mt-3">
+            <Callout tone="warning">
+              Your history could not be loaded just now, so this list may be
+              incomplete. Nothing about your application has changed.
+            </Callout>
+          </div>
+        ) : null}
         <ul className="mt-3 flex flex-col gap-3">
           {(events as ReviewEventRow[] | null)?.map((event) => (
             <li key={event.id} className="text-sm">

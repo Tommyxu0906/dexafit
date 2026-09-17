@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState } from "@/components/ui";
+import { Badge, Callout, Card, EmptyState } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
 import { PROFESSION_LABELS, type ProfessionType } from "@/lib/domain/enums";
 import { createClient } from "@/lib/supabase/server";
@@ -23,11 +23,27 @@ function isExpired(date: string | null): boolean {
   return date ? new Date(`${date}T23:59:59Z`).getTime() < Date.now() : false;
 }
 
-export default async function AdminProfessionalsPage() {
+const DECISION_MESSAGES: Record<string, { tone: "success" | "warning" | "danger"; text: string }> = {
+  APPROVED: { tone: "success", text: "approved and is now listed on the marketplace." },
+  REJECTED: { tone: "danger", text: "was rejected." },
+  SUSPENDED: { tone: "danger", text: "was suspended and is no longer listed." },
+  NEEDS_INFORMATION: {
+    tone: "warning",
+    text: "was sent back for more information. They can see your note on their status page.",
+  },
+};
+
+export default async function AdminProfessionalsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ decided?: string; name?: string }>;
+}) {
   await requireAdmin();
+  const { decided, name } = await searchParams;
+  const decision = decided ? DECISION_MESSAGES[decided] : undefined;
   const supabase = await createClient();
 
-  const { data: applications } = await supabase
+  const { data: applications, error: queueError } = await supabase
     .from("professional_applications")
     .select(
       `id, status, submitted_at, manual_review_required,
@@ -41,6 +57,12 @@ export default async function AdminProfessionalsPage() {
     // on the provider wizard, which opens a draft for whoever arrives.
     .neq("status", "DRAFT")
     .order("submitted_at", { ascending: false, nullsFirst: false });
+
+  // An empty queue and a failed query look identical on screen, and a reviewer
+  // who believes there is nothing to review simply stops reviewing.
+  if (queueError) {
+    throw new Error(`Could not load the credentialing queue: ${queueError.message}`);
+  }
 
   const rows = (applications ?? []) as unknown as QueueRow[];
 
@@ -61,6 +83,12 @@ export default async function AdminProfessionalsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      {decision ? (
+        <Callout tone={decision.tone}>
+          <strong>{name || "The applicant"}</strong> {decision.text}
+        </Callout>
+      ) : null}
+
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-ink">Professionals</h1>
         <p className="mt-1 text-sm text-muted">

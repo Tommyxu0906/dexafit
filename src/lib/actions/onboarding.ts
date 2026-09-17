@@ -33,6 +33,13 @@ import { failure, success, toFieldErrors, type ActionState } from "./state";
 
 const ONBOARDING_BASE = "/professionals/onboarding";
 
+/** Matches the readiness engine, so submit and approve agree on what expired means. */
+function isExpired(date: string | null | undefined): boolean {
+  if (!date) return false;
+  const parsed = new Date(`${date}T23:59:59Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.getTime() < Date.now();
+}
+
 function revalidateOnboarding() {
   revalidatePath(ONBOARDING_BASE, "layout");
 }
@@ -886,6 +893,22 @@ export async function submitApplication(
     if (requirement.requiresDocument && !credential.document_id) {
       problems.push(`Upload documentation for ${requirement.label}.`);
     }
+    // Catch a lapsed credential here rather than letting the application sit in
+    // the queue until a reviewer finds approval will not unlock.
+    if (isExpired(credential.expiration_date)) {
+      problems.push(
+        `${requirement.label} expired on ${credential.expiration_date}. Renew it and upload the current one.`,
+      );
+    }
+  }
+
+  const expiredPolicy = bundle.insurancePolicies.find((p) =>
+    isExpired(p.expiration_date),
+  );
+  if (requirements.insuranceRequired && expiredPolicy) {
+    problems.push(
+      `Your ${expiredPolicy.carrier_name} policy expired on ${expiredPolicy.expiration_date}.`,
+    );
   }
 
   if (requirements.insuranceRequired && bundle.insurancePolicies.length === 0) {

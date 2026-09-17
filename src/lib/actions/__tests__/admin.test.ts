@@ -216,15 +216,25 @@ describe("admin approval recomputes readiness server-side", () => {
   it("approves when the freshly loaded state satisfies every rule", async () => {
     bundle = buildBundle({ credentialExpiration: "2099-01-01" });
 
-    const result = await decideApplication({ ok: false }, approvalForm());
+    // A successful decision closes the review and sends the reviewer back to the
+    // queue, which Next signals by throwing its redirect.
+    await expect(decideApplication({ ok: false }, approvalForm())).rejects.toThrow(
+      "NEXT_REDIRECT",
+    );
 
-    expect(result.ok).toBe(true);
     const approved = updateSpy.mock.calls.find(
       ([table, payload]) =>
         table === "professional_applications" &&
         (payload as { status?: string }).status === "APPROVED",
     );
     expect(approved).toBeDefined();
+
+    const activated = updateSpy.mock.calls.find(
+      ([table, payload]) =>
+        table === "professional_profiles" &&
+        (payload as { marketplace_status?: string }).marketplace_status === "ACTIVE",
+    );
+    expect(activated).toBeDefined();
   });
 
   it("refuses approval when a credential expired after the reviewer loaded the page", async () => {

@@ -10,11 +10,14 @@ export default async function PracticeStep() {
   let organization = null;
   if (profile.organization_id) {
     const supabase = await createClient();
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("organizations")
       .select("*")
       .eq("id", profile.organization_id)
       .maybeSingle();
+    if (error) {
+      throw new Error(`Could not load your organization details: ${error.message}`);
+    }
     organization = data;
   }
 

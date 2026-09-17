@@ -36,12 +36,17 @@ export default async function AdminProfessionalDetail({
   const { id } = await params;
 
   const supabase = await createClient();
-  const { data: application } = await supabase
+  const { data: application, error: applicationError } = await supabase
     .from("professional_applications")
     .select("professional_id")
     .eq("id", id)
     .maybeSingle();
 
+  // Distinguish "no such application" from "the lookup failed"; reporting a
+  // database error as a 404 sends the reviewer looking for the wrong problem.
+  if (applicationError) {
+    throw new Error(`Could not load this application: ${applicationError.message}`);
+  }
   if (!application) notFound();
 
   const bundle = await getApplicationBundle(application.professional_id);
@@ -54,7 +59,7 @@ export default async function AdminProfessionalDetail({
     ? getRequirements(profile.profession_type, jurisdiction)
     : null;
 
-  const { data: events } = await supabase
+  const { data: events, error: eventsError } = await supabase
     .from("application_review_events")
     .select("*")
     .eq("application_id", id)
@@ -402,6 +407,14 @@ export default async function AdminProfessionalDetail({
 
           <Card>
             <h2 className="mb-4 text-sm font-bold text-ink">Review history</h2>
+            {eventsError ? (
+              <div className="mb-3">
+                <Callout tone="warning">
+                  History could not be loaded, so this is not a complete record.
+                  Do not treat it as evidence of what has or has not happened.
+                </Callout>
+              </div>
+            ) : null}
             <ul className="flex flex-col gap-3">
               {((events ?? []) as ReviewEventRow[]).map((event) => (
                 <li key={event.id} className="border-l-2 border-line pl-3 text-sm">
