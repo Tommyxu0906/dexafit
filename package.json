@@ -9,7 +9,9 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
-    "test:db": "psql -v ON_ERROR_STOP=1 -f supabase/tests/security.sql"
+    "test:db": "scripts/psql.sh -f supabase/tests/security.sql",
+    "seed:demo": "scripts/psql.sh -v allow_demo_seed=yes -f supabase/seed/demo.sql",
+    "audit:documents": "scripts/psql.sh -f supabase/tools/orphaned-documents.sql"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",
