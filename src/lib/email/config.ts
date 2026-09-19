@@ -1,3 +1,5 @@
+import { resolveAppUrl } from "../env";
+
 /**
  * Email configuration, read from the environment at send time.
  *
@@ -24,7 +26,6 @@ export type EmailConfigResult =
  * an address on a verified DexaFit domain before notifying anyone else.
  */
 const DEFAULT_FROM = "DexaFit Onboarding <onboarding@resend.dev>";
-const DEFAULT_APP_URL = "http://localhost:3000";
 
 function splitRecipients(raw: string | undefined): string[] {
   if (!raw) return [];
@@ -54,6 +55,11 @@ export function readEmailConfig(env: EmailEnv = process.env): EmailConfigResult 
     };
   }
 
+  const appUrl = resolveAppUrl(env);
+  if (!appUrl.ok) {
+    return { configured: false, reason: appUrl.reason };
+  }
+
   return {
     configured: true,
     config: {
@@ -64,7 +70,7 @@ export function readEmailConfig(env: EmailEnv = process.env): EmailConfigResult 
       // identity nobody reads, so replies are pointed at a person: SUPPORT_EMAIL
       // if set, otherwise the first credentialing admin.
       supportEmail: env.SUPPORT_EMAIL?.trim() || adminRecipients[0],
-      appUrl: (env.APP_URL || env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL).replace(/\/+$/, ""),
+      appUrl: appUrl.appUrl,
     },
   };
 }

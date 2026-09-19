@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A new push to the same branch makes the previous run irrelevant.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      # Generates the route types it needs, so it does not depend on the build
+      # having run first.
+      - run: npm run typecheck
+
+      - run: npm test
+
+      # No secrets: every route is server-rendered on demand, so nothing reads
+      # Supabase or Resend configuration at build time. Verified by building
+      # with no environment file present. If that ever stops being true, this
+      # step fails rather than a deploy.
+      - run: npm run build
