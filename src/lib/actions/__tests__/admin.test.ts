@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ApplicationBundle } from "../../data/types";
 
 const updateSpy = vi.fn();
 const insertSpy = vi.fn();
 const sendSpy = vi.fn();
 let bundle: ApplicationBundle;
+
+/** Set to make the application lookup fail, as a dropped connection would. */
+let lookupError: { message: string } | null = null;
 
 /** What verified_auth_email() returns for the professional under test. */
 let rpcResult: { data: unknown; error: { message: string } | null } = {
@@ -57,8 +60,9 @@ vi.mock("../../supabase/server", () => ({
         select: () => ({
           eq: () => ({
             maybeSingle: async () => ({
+              error: table === "professional_applications" ? lookupError : null,
               data:
-                table === "professional_applications"
+                table === "professional_applications" && !lookupError
                   ? {
                       id: "app-1",
                       status: "CREDENTIAL_REVIEW",
@@ -447,5 +451,34 @@ describe("provider notifications", () => {
           (payload as { marketplace_status?: string }).marketplace_status === "ACTIVE",
       ),
     ).toBe(true);
+  });
+});
+
+describe("a failed read is never dressed up as an empty result", () => {
+  beforeEach(() => {
+    updateSpy.mockClear();
+    lookupError = null;
+    bundle = buildBundle({ credentialExpiration: "2099-01-01" });
+  });
+
+  afterEach(() => {
+    lookupError = null;
+    vi.restoreAllMocks();
+  });
+
+  it("does not report a failed application lookup as 'not found'", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    lookupError = { message: "connection terminated unexpectedly" };
+
+    const result = await decideApplication({ ok: false }, decisionForm("approve"));
+
+    expect(result.ok).toBe(false);
+    // "Not found" would send the reviewer hunting for a deleted record and
+    // invite them to retry a decision that never ran.
+    expect(result.message).not.toMatch(/not found/i);
+    expect(result.message).toMatch(/evt_[0-9a-f]{10}/);
+
+    // And nothing may be written off the back of a read that failed.
+    expect(updateSpy).not.toHaveBeenCalled();
   });
 });

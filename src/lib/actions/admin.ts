@@ -13,6 +13,7 @@ import {
   type ProviderNotificationType,
 } from "../email/provider-notifications";
 import { resolveVerifiedProviderEmail } from "../email/recipients";
+import { captureServerError } from "../observability";
 import { createClient } from "../supabase/server";
 import { failure, success, type ActionState } from "./state";
 import { formString } from "./helpers";
@@ -45,7 +46,12 @@ async function recordEvent(params: {
   });
 
   if (error) {
-    console.error(`Could not record "${params.eventType}" in the audit trail:`, error);
+    captureServerError(error, {
+      operation: "admin.recordEvent",
+      applicationId: params.applicationId,
+      userId: params.actorId,
+      detail: params.eventType,
+    });
   }
 }
 
@@ -200,11 +206,22 @@ export async function decideApplication(
   if (!applicationId || !decision) return failure("Missing input.");
 
   const supabase = await createClient();
-  const { data: application } = await supabase
+  const { data: application, error: lookupError } = await supabase
     .from("professional_applications")
     .select("id, status, professional_id")
     .eq("id", applicationId)
     .maybeSingle();
+
+  // "Not found" would send the reviewer looking for a deleted record when the
+  // lookup simply failed, and invites them to retry a decision that never ran.
+  if (lookupError) {
+    const { eventId } = captureServerError(lookupError, {
+      operation: "admin.decideApplication.lookup",
+      userId: admin.id,
+      applicationId,
+    });
+    return failure(`Could not load this application. Reference ${eventId}.`);
+  }
 
   if (!application) return failure("Application not found.");
 

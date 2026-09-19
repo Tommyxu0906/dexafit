@@ -24,6 +24,7 @@ import { getApplicationBundle, primaryJurisdiction } from "../data/professional"
 import { notifyAdminsOfSubmission } from "../email/notifications";
 import { notifyProvider } from "../email/provider-notifications";
 import { resolveVerifiedProviderEmail } from "../email/recipients";
+import { captureServerError } from "../observability";
 import { createClient } from "../supabase/server";
 import {
   formBoolean,
@@ -162,7 +163,13 @@ export async function savePractice(
     };
 
     if (organizationId) {
-      await supabase.from("organizations").update(payload).eq("id", organizationId);
+      // This is the user's own edit to their practice details. Dropping it and
+      // advancing to the next step tells them it saved when it did not.
+      const { error: organizationError } = await supabase
+        .from("organizations")
+        .update(payload)
+        .eq("id", organizationId);
+      if (organizationError) return failure(organizationError.message);
     } else {
       const { data, error } = await supabase
         .from("organizations")
@@ -172,11 +179,16 @@ export async function savePractice(
       if (error) return failure(error.message);
       organizationId = data.id;
 
-      await supabase.from("professional_organization_memberships").insert({
-        professional_id: professionalId,
-        organization_id: organizationId,
-        role: value.joiningAs === "ORGANIZATION_OWNER" ? "OWNER" : "MEMBER",
-      });
+      // Without the membership row the organization exists but nobody belongs
+      // to it, so the provider's own practice becomes unreachable to them.
+      const { error: membershipError } = await supabase
+        .from("professional_organization_memberships")
+        .insert({
+          professional_id: professionalId,
+          organization_id: organizationId,
+          role: value.joiningAs === "ORGANIZATION_OWNER" ? "OWNER" : "MEMBER",
+        });
+      if (membershipError) return failure(membershipError.message);
     }
   }
 
@@ -730,10 +742,21 @@ export async function saveLocation(
   // Mirror the location into a service jurisdiction, linked to a license held in
   // that state when one exists. This is the hook nationwide expansion builds on.
   if (profile.profession_type) {
-    const { data: credentials } = await supabase
+    const { data: credentials, error: credentialsError } = await supabase
       .from("credentials")
       .select("id, credential_type, jurisdiction_state")
       .eq("professional_id", professionalId);
+
+    // A failed read here would silently mirror the location with no licence
+    // attached, which reads downstream as "this provider holds no licence in
+    // the state they practise in".
+    if (credentialsError) {
+      captureServerError(credentialsError, {
+        operation: "onboarding.saveServiceLocation.linkJurisdiction",
+        professionalId,
+        detail: "credentials lookup",
+      });
+    }
 
     const licenseInState = credentials?.find(
       (c) =>
@@ -986,7 +1009,11 @@ export async function submitApplication(
   // never pass unnoticed the way it did when the insert policy silently rejected
   // this event.
   if (auditError) {
-    console.error("Failed to record submission in the audit trail:", auditError);
+    captureServerError(auditError, {
+      operation: "onboarding.submitApplication.audit",
+      applicationId: application.id,
+      professionalId,
+    });
   }
 
   // The application is stored. Both notifications run after the response so a

@@ -1,6 +1,7 @@
 import { requireUser } from "../auth";
 import { getOrCreateProfessional } from "../data/professional";
 import type { ApplicationRow, ProfessionalProfileRow } from "../data/types";
+import { captureServerError } from "../observability";
 import { createClient } from "../supabase/server";
 
 export type OnboardingContext = {
@@ -28,7 +29,11 @@ export async function markStepComplete(
     .eq("id", application.id);
 
   if (error) {
-    console.error(`Could not record progress for step "${step}":`, error);
+    captureServerError(error, {
+      operation: "onboarding.markStepComplete",
+      applicationId: application.id,
+      detail: step,
+    });
   }
 }
 
@@ -97,7 +102,10 @@ export async function reopenForReview(
     });
 
   if (auditError) {
-    console.error("Could not record the reopen event in the audit trail:", auditError);
+    captureServerError(auditError, {
+      operation: "onboarding.reopenForReview.audit",
+      applicationId: application.id,
+    });
   }
 }
 
