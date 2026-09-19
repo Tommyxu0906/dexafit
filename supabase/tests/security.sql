@@ -327,5 +327,85 @@ select assert(
   (select count(*) from application_review_events) > 0,
   'audit history cannot be deleted');
 
+-- ---------------------------------------------------------------------------
+-- The verified recipient address
+-- ---------------------------------------------------------------------------
+--
+-- professional_profiles.email is self-entered. Anything sent to a provider
+-- about their application must go to the confirmed auth address instead, and
+-- only the provider themselves or an admin may resolve it.
+
+-- The section above leaves us as `authenticated`; fixtures are set up as the
+-- owner.
+reset role;
+
+update auth.users set email_confirmed_at = now()
+ where id in ('aaaa0000-0000-4000-8000-000000000001',
+              'cccc0000-0000-4000-8000-000000000003');
+
+-- A plausible-looking address typed into the form by someone who does not own
+-- the account. It must never become a recipient.
+update professional_profiles set email = 'attacker@evil.test'
+ where id = '1111aaaa-0000-4000-8000-000000000001';
+
+set local role authenticated;
+
+select act_as('aaaa0000-0000-4000-8000-000000000001');
+select assert(
+  verified_auth_email('1111aaaa-0000-4000-8000-000000000001') = 'provider@test.local',
+  'a provider resolves their own confirmed auth address');
+
+select assert(
+  verified_auth_email('1111aaaa-0000-4000-8000-000000000001')
+    is distinct from (select email from professional_profiles
+                      where id = '1111aaaa-0000-4000-8000-000000000001'),
+  'the resolved address is the auth address, not the self-entered one');
+
+select act_as('cccc0000-0000-4000-8000-000000000003');
+select assert(
+  verified_auth_email('1111aaaa-0000-4000-8000-000000000001') is null,
+  'one provider cannot resolve another provider address');
+
+select act_as('bbbb0000-0000-4000-8000-000000000002');
+select assert(
+  verified_auth_email('1111aaaa-0000-4000-8000-000000000001') = 'provider@test.local',
+  'an admin resolves a provider address in order to notify them');
+
+reset role;
+
+-- The body's filter already returns nothing to an anonymous caller, but a
+-- function that reads auth.users with definer rights should not be reachable
+-- unauthenticated at all. Supabase's default privileges grant anon EXECUTE on
+-- new public functions, so this has to be revoked by name and stay revoked.
+select assert(
+  not has_function_privilege('anon', 'verified_auth_email(uuid)', 'EXECUTE'),
+  'an anonymous caller cannot execute the address lookup');
+
+-- An address nobody has ever confirmed proves nothing about who holds it.
+update auth.users set email_confirmed_at = null
+ where id = 'aaaa0000-0000-4000-8000-000000000001';
+
+set local role authenticated;
+select act_as('aaaa0000-0000-4000-8000-000000000001');
+select assert(
+  verified_auth_email('1111aaaa-0000-4000-8000-000000000001') is null,
+  'an unconfirmed address is not a valid recipient');
+reset role;
+
+update auth.users set email_confirmed_at = now()
+ where id = 'aaaa0000-0000-4000-8000-000000000001';
+
+-- The admin UI reads app_users.email; it used to be copied once at signup and
+-- then drift forever.
+update auth.users set email = 'provider-new@test.local'
+ where id = 'aaaa0000-0000-4000-8000-000000000001';
+select assert(
+  (select email from app_users where id = 'aaaa0000-0000-4000-8000-000000000001')
+    = 'provider-new@test.local',
+  'a changed auth address propagates to the app_users mirror');
+
+update auth.users set email = 'provider@test.local'
+ where id = 'aaaa0000-0000-4000-8000-000000000001';
+
 reset role;
 rollback;

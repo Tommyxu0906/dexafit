@@ -22,6 +22,8 @@ import {
 } from "../domain/schemas";
 import { getApplicationBundle, primaryJurisdiction } from "../data/professional";
 import { notifyAdminsOfSubmission } from "../email/notifications";
+import { notifyProvider } from "../email/provider-notifications";
+import { resolveVerifiedProviderEmail } from "../email/recipients";
 import { createClient } from "../supabase/server";
 import {
   formBoolean,
@@ -987,27 +989,46 @@ export async function submitApplication(
     console.error("Failed to record submission in the audit trail:", auditError);
   }
 
-  // The application is stored. Notifying the credentialing admins runs after the
-  // response so a slow or broken mail provider can never delay or fail a
-  // submission — `after` still runs through the redirect below.
+  // The application is stored. Both notifications run after the response so a
+  // slow or broken mail provider can never delay or fail a submission — `after`
+  // still runs through the redirect below.
+  const applicantName =
+    profile.display_name ||
+    [profile.legal_first_name, profile.legal_last_name].filter(Boolean).join(" ") ||
+    "A new applicant";
+  const professionLabel = PROFESSION_LABELS[profile.profession_type];
+
   const notification = {
     applicationId: application.id,
-    applicantName:
-      profile.display_name ||
-      [profile.legal_first_name, profile.legal_last_name].filter(Boolean).join(" ") ||
-      "A new applicant",
-    professionLabel: PROFESSION_LABELS[profile.profession_type],
+    applicantName,
+    professionLabel,
     jurisdictionState: jurisdiction,
     contactEmail: profile.email,
     submittedAt,
     manualReviewRequired: manualReview,
   };
 
+  // Resolved here, not inside the callback: the lookup is authorized from the
+  // request's session, so it runs while that session is unambiguously in scope.
+  const recipient = await resolveVerifiedProviderEmail(professionalId);
+  if (!recipient.ok) {
+    console.warn(
+      `[email] No submission confirmation sent for application ${application.id}: ${recipient.reason}`,
+    );
+  }
+
   after(async () => {
     try {
       await notifyAdminsOfSubmission(notification);
+      if (recipient.ok) {
+        await notifyProvider(recipient.email, {
+          type: "SUBMITTED",
+          providerName: profile.legal_first_name || applicantName,
+          professionLabel,
+        });
+      }
     } catch (notifyError) {
-      console.error("Unexpected failure notifying admins of a submission:", notifyError);
+      console.error("Unexpected failure sending submission notifications:", notifyError);
     }
   });
 

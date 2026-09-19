@@ -2,10 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { requireAdmin } from "../auth";
 import { getApplicationBundle, primaryJurisdiction, toReadinessInput } from "../data/professional";
+import { PROFESSION_LABELS } from "../domain/enums";
 import { computeReadiness } from "../domain/readiness";
 import { notifyAdminsOfSubmission } from "../email/notifications";
+import {
+  notifyProvider,
+  type ProviderNotificationType,
+} from "../email/provider-notifications";
+import { resolveVerifiedProviderEmail } from "../email/recipients";
 import { createClient } from "../supabase/server";
 import { failure, success, type ActionState } from "./state";
 import { formString } from "./helpers";
@@ -289,6 +296,49 @@ export async function decideApplication(
   });
 
   revalidateAdmin(applicationId);
+
+  // Tell the provider what happened. Only decisions that ask something of them,
+  // or settle the application, are worth an email — the two stage moves are
+  // internal queue mechanics and mean nothing to an applicant. Suspension is
+  // deliberately not here yet; what a suspended provider should be told is a
+  // product and legal question, not a template.
+  const PROVIDER_IS_TOLD: Record<string, ProviderNotificationType> = {
+    APPROVED: "APPROVED",
+    REJECTED: "REJECTED",
+    NEEDS_INFORMATION: "INFORMATION_REQUESTED",
+  };
+  const notificationType = PROVIDER_IS_TOLD[nextStatus];
+
+  if (notificationType) {
+    // Resolved before `after` so the lookup is authorized by this admin's
+    // session rather than whatever context the callback runs in.
+    const recipient = await resolveVerifiedProviderEmail(application.professional_id);
+    const providerName =
+      bundle.profile.legal_first_name || bundle.profile.display_name || "there";
+
+    if (!recipient.ok) {
+      console.warn(
+        `[email] No ${notificationType} notification sent for application ${applicationId}: ${recipient.reason}`,
+      );
+    } else {
+      after(async () => {
+        try {
+          await notifyProvider(recipient.email, {
+            type: notificationType,
+            providerName,
+            professionLabel: bundle.profile.profession_type
+              ? PROFESSION_LABELS[bundle.profile.profession_type]
+              : null,
+          });
+        } catch (notifyError) {
+          console.error(
+            `Unexpected failure notifying the provider of ${notificationType}:`,
+            notifyError,
+          );
+        }
+      });
+    }
+  }
 
   // Approving, rejecting, suspending or handing the application back all end the
   // reviewer's work on it, so return them to the queue with the outcome. The two

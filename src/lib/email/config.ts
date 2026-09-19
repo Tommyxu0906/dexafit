@@ -10,6 +10,7 @@ export type EmailConfig = {
   apiKey: string;
   from: string;
   adminRecipients: string[];
+  supportEmail: string;
   appUrl: string;
 };
 
@@ -59,6 +60,10 @@ export function readEmailConfig(env: EmailEnv = process.env): EmailConfigResult 
       apiKey,
       from: env.EMAIL_FROM?.trim() || DEFAULT_FROM,
       adminRecipients,
+      // Provider emails invite a reply. The sending address is a no-reply
+      // identity nobody reads, so replies are pointed at a person: SUPPORT_EMAIL
+      // if set, otherwise the first credentialing admin.
+      supportEmail: env.SUPPORT_EMAIL?.trim() || adminRecipients[0],
       appUrl: (env.APP_URL || env.NEXT_PUBLIC_APP_URL || DEFAULT_APP_URL).replace(/\/+$/, ""),
     },
   };
