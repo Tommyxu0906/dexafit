@@ -407,5 +407,55 @@ select assert(
 update auth.users set email = 'provider@test.local'
  where id = 'aaaa0000-0000-4000-8000-000000000001';
 
+-- ---------------------------------------------------------------------------
+-- search_path hijacking
+-- ---------------------------------------------------------------------------
+--
+-- PostgreSQL searches the session's temporary schema first for relation names
+-- whenever pg_temp is not itself listed in a function's search_path. A
+-- SECURITY DEFINER function reading an unqualified `app_users` therefore
+-- resolved to a caller-created temp table in preference to the real one, which
+-- made is_admin() return true for anyone who could run `create temp table`.
+--
+-- These assertions create exactly those shadow relations and confirm the real
+-- objects still win. They run last, and drop the shadows immediately, because
+-- while a shadow exists every later statement would read it too.
+
+reset role;
+set local role authenticated;
+select act_as('aaaa0000-0000-4000-8000-000000000001');
+
+create temp table app_users (id uuid, email text, role text) on commit drop;
+insert into app_users values
+  ('aaaa0000-0000-4000-8000-000000000001', 'attacker@test.local', 'ADMIN');
+select assert(
+  not is_admin(),
+  'a shadow app_users table cannot make a provider an admin');
+drop table pg_temp.app_users;
+
+create temp table professional_profiles (id uuid, user_id uuid, email text)
+  on commit drop;
+insert into professional_profiles values
+  ('2222cccc-0000-4000-8000-000000000003',
+   'aaaa0000-0000-4000-8000-000000000001', 'attacker@test.local');
+select assert(
+  not owns_professional('2222cccc-0000-4000-8000-000000000003'),
+  'a shadow professional_profiles table cannot forge ownership');
+drop table pg_temp.professional_profiles;
+
+reset role;
+
+-- Every definer function must name pg_temp explicitly, or it is exposed the
+-- same way the moment someone adds an unqualified read to it.
+select assert(
+  not exists (
+    select 1 from pg_proc p
+    join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public'
+      and p.prosecdef
+      and not coalesce(array_to_string(p.proconfig, ',') like '%pg_temp%', false)
+  ),
+  'every SECURITY DEFINER function pins pg_temp in its search_path');
+
 reset role;
 rollback;

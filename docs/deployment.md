@@ -80,8 +80,9 @@ link.
       It holds licences and insurance certificates; a public bucket would make
       every one of them a permanent URL.
 - [ ] Run `npm run test:db` against the production database. It rolls itself
-      back and leaves no fixtures. All 35 assertions must pass — this is what
-      proves RLS and the column-authorization triggers actually took.
+      back and leaves no fixtures. All 38 assertions must pass — this is what
+      proves RLS, the column-authorization triggers and the search_path
+      hardening actually took.
 - [ ] Take note of the backup policy for the plan you are on. The free tier's
       retention is short, and this database holds the only copy of applicants'
       credential records.
