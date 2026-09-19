@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { captureServerError } from "../observability";
+import { captureServerError, isSignedOutRatherThanBroken } from "../observability";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -139,5 +139,32 @@ describe("captureServerError", () => {
       "timestamp",
       "userId",
     ]);
+  });
+});
+
+describe("isSignedOutRatherThanBroken", () => {
+  it("treats an anonymous visitor as normal, not as an incident", () => {
+    // getUser() reports "no session" as an error. Reporting it would put an
+    // entry on every page load a logged-out visitor makes.
+    expect(
+      isSignedOutRatherThanBroken(
+        Object.assign(new Error("Auth session missing!"), {
+          name: "AuthSessionMissingError",
+          status: 400,
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it("treats an expired or malformed token as normal", () => {
+    expect(isSignedOutRatherThanBroken({ status: 401 })).toBe(true);
+    expect(isSignedOutRatherThanBroken({ status: 400 })).toBe(true);
+  });
+
+  it("still reports a genuine auth service fault", () => {
+    expect(isSignedOutRatherThanBroken({ status: 500 })).toBe(false);
+    expect(isSignedOutRatherThanBroken({ status: 503 })).toBe(false);
+    expect(isSignedOutRatherThanBroken(new Error("fetch failed"))).toBe(false);
+    expect(isSignedOutRatherThanBroken(null)).toBe(false);
   });
 });

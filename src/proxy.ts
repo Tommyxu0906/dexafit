@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { readPublicSupabaseEnv } from "./lib/env";
-import { captureServerError } from "./lib/observability";
+import {
+  captureServerError,
+  isSignedOutRatherThanBroken,
+} from "./lib/observability";
 
 const PROTECTED_PREFIXES = ["/professionals/onboarding", "/admin"];
 
@@ -39,7 +42,7 @@ export async function proxy(request: NextRequest) {
   // Failing closed is right on a protected route, but it looks identical to a
   // signed-out visitor. Record it so a wave of "my link stopped working" has
   // something behind it.
-  if (authError && authError.status !== 401) {
+  if (authError && !isSignedOutRatherThanBroken(authError)) {
     captureServerError(authError, {
       operation: "proxy.getUser",
       detail: request.nextUrl.pathname,

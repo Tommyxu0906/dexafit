@@ -171,3 +171,25 @@ function parseDsn(dsn: string): { endpoint: string; publicKey: string } | null {
     return null;
   }
 }
+
+/**
+ * Is this auth error just "nobody is signed in"?
+ *
+ * `getUser()` reports an anonymous visitor as an error — AuthSessionMissingError
+ * — and an expired or malformed token with a 400/401. All of those are the
+ * normal state of a public page, not incidents. Reporting them puts an entry on
+ * every page load a logged-out visitor makes, which is the fastest way to make
+ * a monitoring backend worthless.
+ *
+ * Anything else — a 500 from the auth service, a DNS failure, a timeout — is a
+ * real fault and must still be reported.
+ */
+export function isSignedOutRatherThanBroken(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const name = (error as { name?: unknown }).name;
+  if (name === "AuthSessionMissingError") return true;
+
+  const status = (error as { status?: unknown }).status;
+  return status === 400 || status === 401;
+}

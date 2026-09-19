@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { captureServerError } from "./observability";
+import { captureServerError, isSignedOutRatherThanBroken } from "./observability";
 import { createClient } from "./supabase/server";
 
 export type SessionUser = {
@@ -21,7 +21,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
   // An auth service outage is not the same as a signed-out visitor. Returning
   // null for both sends a signed-in user round the login loop with no idea why
   // their magic link keeps "not working".
-  if (authError && authError.status !== 401) {
+  if (authError && !isSignedOutRatherThanBroken(authError)) {
     const { eventId } = captureServerError(authError, { operation: "auth.getUser" });
     throw new Error(
       `We could not verify your session just now. Please try again — reference ${eventId}.`,
