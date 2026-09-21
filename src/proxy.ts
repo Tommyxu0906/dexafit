@@ -1,14 +1,20 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { readPublicSupabaseEnv } from "./lib/env";
+import {
+  captureServerError,
+  isSignedOutRatherThanBroken,
+} from "./lib/observability";
 
 const PROTECTED_PREFIXES = ["/professionals/onboarding", "/admin"];
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  const supabaseEnv = readPublicSupabaseEnv();
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseEnv.url,
+    supabaseEnv.anonKey,
     {
       cookies: {
         getAll() {
@@ -30,7 +36,18 @@ export async function proxy(request: NextRequest) {
   // Refreshes the session cookie; do not remove.
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
+
+  // Failing closed is right on a protected route, but it looks identical to a
+  // signed-out visitor. Record it so a wave of "my link stopped working" has
+  // something behind it.
+  if (authError && !isSignedOutRatherThanBroken(authError)) {
+    captureServerError(authError, {
+      operation: "proxy.getUser",
+      detail: request.nextUrl.pathname,
+    });
+  }
 
   const { pathname } = request.nextUrl;
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));

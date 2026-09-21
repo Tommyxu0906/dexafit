@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { captureServerError } from "@/lib/observability";
 import { createClient } from "@/lib/supabase/server";
 import { DOCUMENT_BUCKET, SIGNED_URL_TTL_SECONDS } from "@/lib/storage";
 
@@ -22,11 +23,25 @@ export async function GET(
   const { id } = await params;
   const supabase = await createClient();
 
-  const { data: document } = await supabase
+  const { data: document, error: lookupError } = await supabase
     .from("professional_documents")
     .select("id, storage_key, original_filename, mime_type")
     .eq("id", id)
     .maybeSingle();
+
+  // A failed lookup is not a missing document. Reporting it as 404 sends the
+  // reviewer hunting for a file that is sitting there intact.
+  if (lookupError) {
+    const { eventId } = captureServerError(lookupError, {
+      operation: "documents.lookup",
+      userId: user.id,
+      documentId: id,
+    });
+    return NextResponse.json(
+      { error: "Could not look up this document", eventId },
+      { status: 500 },
+    );
+  }
 
   if (!document) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -37,7 +52,15 @@ export async function GET(
     .createSignedUrl(document.storage_key, SIGNED_URL_TTL_SECONDS);
 
   if (error || !data) {
-    return NextResponse.json({ error: "Could not sign document" }, { status: 500 });
+    const { eventId } = captureServerError(error ?? "No signed URL returned", {
+      operation: "documents.sign",
+      userId: user.id,
+      documentId: id,
+    });
+    return NextResponse.json(
+      { error: "Could not sign document", eventId },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({

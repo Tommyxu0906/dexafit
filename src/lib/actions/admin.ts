@@ -2,10 +2,18 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { requireAdmin } from "../auth";
 import { getApplicationBundle, primaryJurisdiction, toReadinessInput } from "../data/professional";
+import { PROFESSION_LABELS } from "../domain/enums";
 import { computeReadiness } from "../domain/readiness";
 import { notifyAdminsOfSubmission } from "../email/notifications";
+import {
+  notifyProvider,
+  type ProviderNotificationType,
+} from "../email/provider-notifications";
+import { resolveVerifiedProviderEmail } from "../email/recipients";
+import { captureServerError } from "../observability";
 import { createClient } from "../supabase/server";
 import { failure, success, type ActionState } from "./state";
 import { formString } from "./helpers";
@@ -38,7 +46,12 @@ async function recordEvent(params: {
   });
 
   if (error) {
-    console.error(`Could not record "${params.eventType}" in the audit trail:`, error);
+    captureServerError(error, {
+      operation: "admin.recordEvent",
+      applicationId: params.applicationId,
+      userId: params.actorId,
+      detail: params.eventType,
+    });
   }
 }
 
@@ -193,11 +206,22 @@ export async function decideApplication(
   if (!applicationId || !decision) return failure("Missing input.");
 
   const supabase = await createClient();
-  const { data: application } = await supabase
+  const { data: application, error: lookupError } = await supabase
     .from("professional_applications")
     .select("id, status, professional_id")
     .eq("id", applicationId)
     .maybeSingle();
+
+  // "Not found" would send the reviewer looking for a deleted record when the
+  // lookup simply failed, and invites them to retry a decision that never ran.
+  if (lookupError) {
+    const { eventId } = captureServerError(lookupError, {
+      operation: "admin.decideApplication.lookup",
+      userId: admin.id,
+      applicationId,
+    });
+    return failure(`Could not load this application. Reference ${eventId}.`);
+  }
 
   if (!application) return failure("Application not found.");
 
@@ -289,6 +313,49 @@ export async function decideApplication(
   });
 
   revalidateAdmin(applicationId);
+
+  // Tell the provider what happened. Only decisions that ask something of them,
+  // or settle the application, are worth an email — the two stage moves are
+  // internal queue mechanics and mean nothing to an applicant. Suspension is
+  // deliberately not here yet; what a suspended provider should be told is a
+  // product and legal question, not a template.
+  const PROVIDER_IS_TOLD: Record<string, ProviderNotificationType> = {
+    APPROVED: "APPROVED",
+    REJECTED: "REJECTED",
+    NEEDS_INFORMATION: "INFORMATION_REQUESTED",
+  };
+  const notificationType = PROVIDER_IS_TOLD[nextStatus];
+
+  if (notificationType) {
+    // Resolved before `after` so the lookup is authorized by this admin's
+    // session rather than whatever context the callback runs in.
+    const recipient = await resolveVerifiedProviderEmail(application.professional_id);
+    const providerName =
+      bundle.profile.legal_first_name || bundle.profile.display_name || "there";
+
+    if (!recipient.ok) {
+      console.warn(
+        `[email] No ${notificationType} notification sent for application ${applicationId}: ${recipient.reason}`,
+      );
+    } else {
+      after(async () => {
+        try {
+          await notifyProvider(recipient.email, {
+            type: notificationType,
+            providerName,
+            professionLabel: bundle.profile.profession_type
+              ? PROFESSION_LABELS[bundle.profile.profession_type]
+              : null,
+          });
+        } catch (notifyError) {
+          console.error(
+            `Unexpected failure notifying the provider of ${notificationType}:`,
+            notifyError,
+          );
+        }
+      });
+    }
+  }
 
   // Approving, rejecting, suspending or handing the application back all end the
   // reviewer's work on it, so return them to the queue with the outcome. The two

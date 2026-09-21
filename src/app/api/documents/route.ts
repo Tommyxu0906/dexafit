@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionUser } from "@/lib/auth";
+import { captureServerError } from "@/lib/observability";
 import { getOrCreateProfessional } from "@/lib/data/professional";
 import { DOCUMENT_TYPES, type DocumentType } from "@/lib/domain/enums";
 import { createClient } from "@/lib/supabase/server";
@@ -64,7 +65,18 @@ export async function POST(request: Request) {
     .single();
 
   if (error) {
-    await supabase.storage.from(DOCUMENT_BUCKET).remove([storageKey]);
+    // Best effort: the caller already has their error. If the rollback itself
+    // fails the object is orphaned in storage, which is worth knowing about.
+    const { error: rollbackError } = await supabase.storage
+      .from(DOCUMENT_BUCKET)
+      .remove([storageKey]);
+    if (rollbackError) {
+      captureServerError(rollbackError, {
+        operation: "documents.rollbackUpload",
+        userId: user.id,
+        detail: "orphaned object left in storage",
+      });
+    }
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 

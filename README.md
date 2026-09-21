@@ -31,11 +31,44 @@ npm run build      # production build
 npm run typecheck  # tsc --noEmit
 npm run lint       # eslint
 npm test           # vitest — rules engine and server actions
-npm run test:db    # psql — RLS and column authorization (needs PG* env or a connection string)
+npm run test:db    # psql — RLS and column authorization, against SUPABASE_DB_URL
+npm run seed:demo  # replace the four demo applicants (never runs by accident)
+npm run audit:documents   # read-only report on orphaned uploads
 ```
+
+The psql-backed commands read `SUPABASE_DB_URL` from `.env.local` and find
+`psql` themselves; see [scripts/psql.sh](scripts/psql.sh).
 
 Before merging, work through [docs/smoke-test.md](docs/smoke-test.md): the
 database layer is regression-tested but the browser flow is not.
+
+## Demo data
+
+`npm run seed:demo` writes four fictional applicants, sitting at different
+points in the queue:
+
+| | | |
+| --- | --- | --- |
+| Marcus Whitfield | personal trainer | everything verified — Approve is unlocked |
+| Elena Vasquez | physical therapist | state licence still to verify |
+| Rachel Kim | LICSW | licensed, independently listable |
+| Daniel Oyelaran | LCSW | same discipline, *not* independently listable, forced to manual review |
+
+The last two are the pair worth showing: same field, different licence,
+different outcome, decided by rule rather than by whoever is reviewing.
+
+Re-running replaces them and touches nothing else. It refuses to run without
+an explicit flag, which `npm run seed:demo` supplies, so it cannot be triggered
+by accident. Every address is `@demo.dexafit.invalid` — `.invalid` is reserved
+by RFC 2606 and cannot resolve, so a stray notification can never reach a real
+person.
+
+One limitation: document *rows* are seeded but the files behind them are not,
+because bytes cannot be written to Storage over SQL. The review page lists each
+document; downloading one will fail. Upload a file through the wizard if a
+walkthrough needs a working download.
+
+Deploying is [docs/deployment.md](docs/deployment.md).
 
 ## Structure
 
