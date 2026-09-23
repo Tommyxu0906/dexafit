@@ -56,6 +56,10 @@ export const aboutYouSchema = z.object({
   professionalTitle: z.string().trim().min(1, "Required").max(120),
   // A professional may hold several qualifications at once; the required
   // credentials are the union across all of them.
+  // Asked in step 1 rather than step 2: whether someone is an individual or
+  // part of a clinic decides what the rest of the wizard has to collect, and
+  // finding out late means asking questions that turn out not to apply.
+  joiningAs: z.enum(JOINING_AS),
   professionTypes: z
     .array(z.enum(PROFESSION_TYPES))
     .min(1, "Select at least one")
@@ -76,6 +80,8 @@ export type AboutYouInput = z.infer<typeof aboutYouSchema>;
 
 export const practiceSchema = z
   .object({
+    // Carried from step 1, not re-asked. The form posts it back so validation
+    // can branch on it; the stored profile is what the server trusts.
     joiningAs: z.enum(JOINING_AS),
     practiceName: optionalText,
     organizationLegalName: optionalText,

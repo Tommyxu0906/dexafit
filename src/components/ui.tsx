@@ -174,6 +174,44 @@ export function RequirementTag({
   );
 }
 
+/** Exclusive sibling of CheckboxRow, for a choice that branches the wizard. */
+export function RadioRow({
+  name,
+  value,
+  label,
+  defaultChecked,
+  description,
+}: {
+  name: string;
+  value: string;
+  label: string;
+  defaultChecked?: boolean;
+  description?: string;
+}) {
+  const id = `${name}-${value}`;
+  return (
+    <label
+      htmlFor={id}
+      className="flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-white p-3 text-sm hover:bg-slate-50 has-checked:border-accent has-checked:bg-emerald-50/50"
+    >
+      <input
+        id={id}
+        type="radio"
+        name={name}
+        value={value}
+        defaultChecked={defaultChecked}
+        className="mt-0.5 h-4 w-4 accent-emerald-600"
+      />
+      <span>
+        <span className="font-medium text-ink">{label}</span>
+        {description ? (
+          <span className="mt-0.5 block text-xs text-muted">{description}</span>
+        ) : null}
+      </span>
+    </label>
+  );
+}
+
 export function CheckboxRow({
   name,
   value,
