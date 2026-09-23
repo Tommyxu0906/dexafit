@@ -20,10 +20,10 @@ import {
 import { PROFESSION_LABELS, type ProfessionType } from "@/lib/domain/enums";
 
 export function CapabilitiesForm({
-  professionType,
+  professionTypes,
   selected,
 }: {
-  professionType: ProfessionType;
+  professionTypes: readonly ProfessionType[];
   selected: string[];
 }) {
   const [state, formAction, pending] = useActionState(saveCapabilities, idleState);
@@ -31,7 +31,7 @@ export function CapabilitiesForm({
 
   // Only in-scope options are rendered at all — out-of-scope clinical capabilities
   // are never offered to professions that cannot lawfully claim them.
-  const allowed = new Set(allowedCapabilities(professionType));
+  const allowed = new Set(allowedCapabilities(professionTypes));
   const populations = CLIENT_POPULATIONS.filter((c) => allowed.has(c));
   const dexa = DEXA_CAPABILITIES.filter((c) => allowed.has(c));
   const clinical = [...allowed].filter(
@@ -50,7 +50,8 @@ export function CapabilitiesForm({
       />
 
       <Callout tone="info">
-        Options are limited to what a {PROFESSION_LABELS[professionType].toLowerCase()} may
+        Options are limited to what a{" "}
+        {professionTypes.map((t) => PROFESSION_LABELS[t].toLowerCase()).join(" or ")} may
         lawfully provide.
       </Callout>
 

@@ -50,7 +50,9 @@ export default async function ReviewStep() {
         <Row
           label="Profession"
           value={
-            profile.profession_type ? PROFESSION_LABELS[profile.profession_type] : null
+            profile.profession_types.length > 0
+              ? profile.profession_types.map((t) => PROFESSION_LABELS[t]).join(", ")
+              : null
           }
         />
         <Row label="Title" value={profile.professional_title} />

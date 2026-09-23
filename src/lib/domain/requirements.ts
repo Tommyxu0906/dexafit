@@ -13,6 +13,19 @@ import type { AprnCategory, CredentialType, ProfessionType } from "./enums";
  * a Massachusetts license, and the UI copy must not imply otherwise.
  */
 export type CredentialRequirement = {
+  /**
+   * Stable identity for this requirement, and the value a stored credential
+   * records to say which requirement it satisfies.
+   *
+   * A professional may hold several professions at once, and two of them can
+   * demand the same credential *type* while meaning different documents: a
+   * physical therapist and a dietitian both need a STATE_LICENSE, and one
+   * licence does not satisfy the other. Matching on credentialType alone let a
+   * single licence tick both boxes. Profession-specific requirements therefore
+   * key as `PROFESSION:CREDENTIAL_TYPE`, while genuinely shared ones (a CPR
+   * card, an NPI number) key on the type alone so they are only asked for once.
+   */
+  key: string;
   credentialType: CredentialType;
   /** Provider-facing label. Never phrase a marketplace rule as a state license. */
   label: string;
@@ -33,21 +46,39 @@ export type CredentialRequirement = {
   manualReviewIfMissing?: boolean;
 };
 
-/** Extra profession-specific questions rendered on the credentials step. */
-export type ExtraQuestion =
-  | "RD_RDN"
-  | "HSP"
-  | "APRN_CATEGORY"
-  | "SUPERVISOR"
-  | "SUPERVISING_ORGANIZATION";
+export type CredentialRequirementSpec = Omit<CredentialRequirement, "key">;
 
-export type ProfessionRequirements = {
+/** Extra profession-specific questions rendered on the credentials step. */
+export type ExtraQuestion = "RD_RDN" | "APRN_CATEGORY";
+
+/** Rules for exactly one profession, before aggregation. */
+type SingleProfessionRules = {
   professionType: ProfessionType;
+  credentials: readonly CredentialRequirementSpec[];
+  insuranceRequired: boolean;
+  independentListingAllowed: boolean;
+  manualReviewRequired: boolean;
+  extraQuestions: readonly ExtraQuestion[];
+  restrictionNotice?: string;
+  scopeAcknowledgement?: string;
+  jurisdictionResearched: boolean;
+};
+
+/**
+ * The rules that apply to a professional, across every profession they hold.
+ *
+ * Aggregation is always toward the stricter answer: insurance and manual review
+ * are required if *any* profession requires them, and independent listing is
+ * allowed only if *every* profession allows it. Holding an extra qualification
+ * can add obligations but must never remove one.
+ */
+export type ProfessionRequirements = {
+  professionTypes: readonly ProfessionType[];
   credentials: readonly CredentialRequirement[];
   insuranceRequired: boolean;
   /**
-   * Whether this profession may be listed as an independent practitioner at all.
-   * False here is a hard product rule (LSMHC, LCSW), not an admin judgment call.
+   * Whether this professional may be listed independently at all. False is a
+   * hard product rule, not an admin judgment call.
    */
   independentListingAllowed: boolean;
   /** Always route to a human, regardless of credential completeness. */
@@ -61,7 +92,7 @@ export type ProfessionRequirements = {
   jurisdictionResearched: boolean;
 };
 
-const CPR_AED: CredentialRequirement = {
+const CPR_AED: CredentialRequirementSpec = {
   credentialType: "CPR_AED",
   label: "CPR/AED certification",
   required: true,
@@ -72,7 +103,7 @@ const CPR_AED: CredentialRequirement = {
   helpText: "Required by DexaFit marketplace policy.",
 };
 
-const NPI_OPTIONAL: CredentialRequirement = {
+const NPI_OPTIONAL: CredentialRequirementSpec = {
   credentialType: "NPI",
   label: "NPI number",
   required: false,
@@ -81,7 +112,7 @@ const NPI_OPTIONAL: CredentialRequirement = {
   requiresNumber: true,
 };
 
-const BOARD_CERT_OPTIONAL: CredentialRequirement = {
+const BOARD_CERT_OPTIONAL: CredentialRequirementSpec = {
   credentialType: "BOARD_CERTIFICATION",
   label: "Board / specialty certification",
   required: false,
@@ -92,8 +123,8 @@ const BOARD_CERT_OPTIONAL: CredentialRequirement = {
 
 function stateLicense(
   label: string,
-  overrides: Partial<CredentialRequirement> = {},
-): CredentialRequirement {
+  overrides: Partial<CredentialRequirementSpec> = {},
+): CredentialRequirementSpec {
   return {
     credentialType: "STATE_LICENSE",
     label,
@@ -111,8 +142,8 @@ function stateLicense(
 function nationalCertification(
   label: string,
   exampleIssuers: readonly string[],
-  overrides: Partial<CredentialRequirement> = {},
-): CredentialRequirement {
+  overrides: Partial<CredentialRequirementSpec> = {},
+): CredentialRequirementSpec {
   return {
     credentialType: "NATIONAL_CERTIFICATION",
     label,
@@ -142,7 +173,7 @@ const FITNESS_CERT_ISSUERS = [
 /**
  * Base rules. Jurisdiction-specific labeling is layered on in `getRequirements`.
  */
-const BASE_REQUIREMENTS: Record<ProfessionType, ProfessionRequirements> = {
+const BASE_RULES: Record<ProfessionType, SingleProfessionRules> = {
   PERSONAL_TRAINER: {
     professionType: "PERSONAL_TRAINER",
     credentials: [
@@ -160,8 +191,14 @@ const BASE_REQUIREMENTS: Record<ProfessionType, ProfessionRequirements> = {
     professionType: "STRENGTH_CONDITIONING_COACH",
     credentials: [
       nationalCertification(
-        "National strength & conditioning certification",
+        "National strength, conditioning or sports performance certification",
         FITNESS_CERT_ISSUERS,
+        {
+          // This category absorbed the former sports performance coach. That one
+          // sent an unrecognised certification to a human rather than blocking
+          // submission, and merging must not quietly make those people ineligible.
+          manualReviewIfMissing: true,
+        },
       ),
       CPR_AED,
     ],
@@ -172,23 +209,26 @@ const BASE_REQUIREMENTS: Record<ProfessionType, ProfessionRequirements> = {
     jurisdictionResearched: true,
   },
 
-  SPORTS_PERFORMANCE_COACH: {
-    professionType: "SPORTS_PERFORMANCE_COACH",
+  // Massachusetts does not license exercise physiologists, so the ACSM
+  // certification is a DexaFit marketplace requirement and must not be labelled
+  // as a state licence.
+  EXERCISE_PHYSIOLOGIST: {
+    professionType: "EXERCISE_PHYSIOLOGIST",
     credentials: [
       nationalCertification(
-        "Relevant national certification",
-        FITNESS_CERT_ISSUERS,
-        {
-          // No recognized certification routes to a human rather than auto-approving.
-          manualReviewIfMissing: true,
-        },
+        "Exercise physiology certification",
+        ["ACSM-EP", "ACSM-CEP", "ASEP", "NSCA", "Other"],
+        { manualReviewIfMissing: true },
       ),
       CPR_AED,
+      BOARD_CERT_OPTIONAL,
     ],
     insuranceRequired: true,
     independentListingAllowed: true,
     manualReviewRequired: false,
     extraQuestions: [],
+    scopeAcknowledgement:
+      "An exercise physiologist may design and supervise exercise programmes. You may not diagnose disease or provide medical nutrition therapy.",
     jurisdictionResearched: true,
   },
 
@@ -273,73 +313,6 @@ const BASE_REQUIREMENTS: Record<ProfessionType, ProfessionRequirements> = {
     independentListingAllowed: true,
     manualReviewRequired: false,
     extraQuestions: [],
-    jurisdictionResearched: true,
-  },
-
-  LMHC: {
-    professionType: "LMHC",
-    credentials: [stateLicense("LMHC license")],
-    insuranceRequired: true,
-    independentListingAllowed: true,
-    manualReviewRequired: false,
-    extraQuestions: [],
-    jurisdictionResearched: true,
-  },
-
-  LSMHC: {
-    professionType: "LSMHC",
-    credentials: [stateLicense("LSMHC license")],
-    insuranceRequired: true,
-    // Supervised license: never eligible for an independent listing.
-    independentListingAllowed: false,
-    manualReviewRequired: true,
-    extraQuestions: ["SUPERVISOR", "SUPERVISING_ORGANIZATION"],
-    restrictionNotice:
-      "LSMHC is a supervised license. You cannot be listed as an independent practitioner; your application requires review and supervisor information.",
-    jurisdictionResearched: true,
-  },
-
-  LMFT: {
-    professionType: "LMFT",
-    credentials: [stateLicense("LMFT license")],
-    insuranceRequired: true,
-    independentListingAllowed: true,
-    manualReviewRequired: false,
-    extraQuestions: [],
-    jurisdictionResearched: true,
-  },
-
-  LICSW: {
-    professionType: "LICSW",
-    credentials: [stateLicense("LICSW license")],
-    insuranceRequired: true,
-    independentListingAllowed: true,
-    manualReviewRequired: false,
-    extraQuestions: [],
-    jurisdictionResearched: true,
-  },
-
-  LCSW: {
-    professionType: "LCSW",
-    credentials: [stateLicense("LCSW license")],
-    insuranceRequired: true,
-    // LCSW cannot hold an independent clinical private practice; LICSW can.
-    independentListingAllowed: false,
-    manualReviewRequired: true,
-    extraQuestions: ["SUPERVISOR", "SUPERVISING_ORGANIZATION"],
-    restrictionNotice:
-      "An LCSW cannot be listed for independent clinical private practice. You may later be listed through an employing organization. Your application requires review.",
-    jurisdictionResearched: true,
-  },
-
-  PSYCHOLOGIST: {
-    professionType: "PSYCHOLOGIST",
-    credentials: [stateLicense("Psychologist license")],
-    insuranceRequired: true,
-    // Conditional: independence depends on the HSP answer, resolved at readiness.
-    independentListingAllowed: true,
-    manualReviewRequired: false,
-    extraQuestions: ["HSP"],
     jurisdictionResearched: true,
   },
 
@@ -458,64 +431,155 @@ const JURISDICTION_NAMES: Record<string, string> = {
 };
 
 /**
- * Resolve the credentialing rules for a profession in a jurisdiction.
+ * Credentials a person holds once, however many professions they list. A CPR
+ * card and an NPI number do not multiply; a licence or a discipline-specific
+ * certification does.
+ */
+const SHARED_CREDENTIALS: ReadonlySet<CredentialType> = new Set<CredentialType>([
+  "CPR_AED",
+  "NPI",
+]);
+
+export function requirementKey(
+  professionType: ProfessionType,
+  credentialType: CredentialType,
+): string {
+  return SHARED_CREDENTIALS.has(credentialType)
+    ? credentialType
+    : `${professionType}:${credentialType}`;
+}
+
+/**
+ * Merge two requirements that resolved to the same key, keeping whichever is
+ * stricter. Two professions asking for the same CPR card must not let the more
+ * lenient of them soften the obligation.
+ */
+function stricter(
+  a: CredentialRequirement,
+  b: CredentialRequirement,
+): CredentialRequirement {
+  return {
+    ...a,
+    required: a.required || b.required,
+    manualReviewIfMissing: Boolean(a.manualReviewIfMissing && b.manualReviewIfMissing),
+    requiresDocument: a.requiresDocument || b.requiresDocument,
+    requiresNumber: a.requiresNumber || b.requiresNumber,
+    requiresExpiration: a.requiresExpiration || b.requiresExpiration,
+    requiresJurisdiction: a.requiresJurisdiction || b.requiresJurisdiction,
+  };
+}
+
+function labelForJurisdiction(
+  requirement: CredentialRequirement,
+  stateName: string,
+): CredentialRequirement {
+  const licenceLike =
+    requirement.credentialType === "STATE_LICENSE" ||
+    requirement.credentialType === "RN_LICENSE" ||
+    requirement.credentialType === "APRN_AUTHORIZATION";
+  return licenceLike
+    ? { ...requirement, label: `${stateName} ${requirement.label}` }
+    : requirement;
+}
+
+/**
+ * Resolve the credentialing rules for everything a professional does, in a
+ * jurisdiction.
  *
  * Only Massachusetts is researched for v1. Other states fall back to generic
  * labeling and manual review rather than asserting rules we have not verified —
  * which is what makes adding NY a config change rather than a rewrite.
  */
 export function getRequirements(
-  professionType: ProfessionType,
+  professionTypes: readonly ProfessionType[],
   jurisdictionState: string,
 ): ProfessionRequirements {
-  const base = BASE_REQUIREMENTS[professionType];
   const researched = (RESEARCHED_JURISDICTIONS as readonly string[]).includes(
     jurisdictionState,
   );
+  const stateName = JURISDICTION_NAMES[jurisdictionState] ?? jurisdictionState;
 
-  if (!researched) {
+  // Nothing chosen yet. Assert no rules rather than guessing at them; the
+  // wizard will not let an application reach submission in this state.
+  if (professionTypes.length === 0) {
     return {
-      ...base,
+      professionTypes: [],
+      credentials: [],
+      insuranceRequired: false,
+      independentListingAllowed: true,
       manualReviewRequired: true,
-      jurisdictionResearched: false,
-      restrictionNotice:
-        base.restrictionNotice ??
-        "DexaFit has not yet completed credentialing rules for this state. Your application will be reviewed manually.",
+      extraQuestions: [],
+      jurisdictionResearched: researched,
     };
   }
 
-  const stateName = JURISDICTION_NAMES[jurisdictionState] ?? jurisdictionState;
+  const byKey = new Map<string, CredentialRequirement>();
+  const extraQuestions = new Set<ExtraQuestion>();
+  const notices: string[] = [];
+  const acknowledgements: string[] = [];
+
+  let insuranceRequired = false;
+  let independentListingAllowed = true;
+  let manualReviewRequired = !researched;
+  let jurisdictionResearched = researched;
+
+  for (const professionType of professionTypes) {
+    const rules = BASE_RULES[professionType];
+
+    for (const spec of rules.credentials) {
+      const keyed: CredentialRequirement = {
+        ...spec,
+        key: requirementKey(professionType, spec.credentialType),
+      };
+      const labelled = researched ? labelForJurisdiction(keyed, stateName) : keyed;
+      const existing = byKey.get(labelled.key);
+      byKey.set(labelled.key, existing ? stricter(existing, labelled) : labelled);
+    }
+
+    for (const question of rules.extraQuestions) extraQuestions.add(question);
+
+    insuranceRequired ||= rules.insuranceRequired;
+    manualReviewRequired ||= rules.manualReviewRequired;
+    independentListingAllowed &&= rules.independentListingAllowed;
+    jurisdictionResearched &&= rules.jurisdictionResearched;
+
+    if (rules.restrictionNotice) notices.push(rules.restrictionNotice);
+    if (rules.scopeAcknowledgement) acknowledgements.push(rules.scopeAcknowledgement);
+  }
+
+  if (!researched) {
+    notices.push(
+      "DexaFit has not yet completed credentialing rules for this state. Your application will be reviewed manually.",
+    );
+  }
 
   return {
-    ...base,
-    jurisdictionResearched: base.jurisdictionResearched,
-    credentials: base.credentials.map((c) =>
-      c.credentialType === "STATE_LICENSE" || c.credentialType === "RN_LICENSE" ||
-      c.credentialType === "APRN_AUTHORIZATION"
-        ? { ...c, label: `${stateName} ${c.label}` }
-        : c,
-    ),
+    professionTypes: [...professionTypes],
+    credentials: [...byKey.values()],
+    insuranceRequired,
+    independentListingAllowed,
+    manualReviewRequired,
+    extraQuestions: [...extraQuestions],
+    restrictionNotice: notices.length > 0 ? notices.join(" ") : undefined,
+    scopeAcknowledgement:
+      acknowledgements.length > 0 ? acknowledgements.join(" ") : undefined,
+    jurisdictionResearched,
   };
 }
 
 export function getRequiredCredentials(
-  professionType: ProfessionType,
+  professionTypes: readonly ProfessionType[],
   jurisdictionState: string,
 ): CredentialRequirement[] {
-  return getRequirements(professionType, jurisdictionState).credentials.filter(
+  return getRequirements(professionTypes, jurisdictionState).credentials.filter(
     (c) => c.required,
   );
 }
 
-/** Professions whose listing is gated on an answer rather than a fixed rule. */
-export function requiresHspForIndependentListing(
-  professionType: ProfessionType,
+export function aprnCategoryRequired(
+  professionTypes: readonly ProfessionType[],
 ): boolean {
-  return professionType === "PSYCHOLOGIST";
-}
-
-export function aprnCategoryRequired(professionType: ProfessionType): boolean {
-  return professionType === "NURSE_PRACTITIONER";
+  return professionTypes.includes("NURSE_PRACTITIONER");
 }
 
 export const APRN_CATEGORY_LABELS: Record<AprnCategory, string> = {

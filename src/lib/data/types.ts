@@ -18,7 +18,8 @@ export type ProfessionalProfileRow = {
   legal_first_name: string | null;
   legal_last_name: string | null;
   display_name: string | null;
-  profession_type: ProfessionType | null;
+  /** Everything this professional practises. Empty until step 1 is saved. */
+  profession_types: ProfessionType[];
   professional_title: string | null;
   bio: string | null;
   years_experience: number | null;
@@ -69,6 +70,8 @@ export type ApplicationRow = {
 export type CredentialRow = {
   id: string;
   professional_id: string;
+  /** Which requirement this credential satisfies; see `requirementKey`. */
+  requirement_key: string | null;
   credential_type: CredentialType;
   credential_name: string;
   credential_number: string | null;

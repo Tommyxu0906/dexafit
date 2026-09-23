@@ -152,18 +152,6 @@ const CLINICAL_MEDICAL_SCOPE: readonly CapabilityCode[] = [
   "MEDICAL_NUTRITION_THERAPY",
 ];
 
-const MENTAL_HEALTH_SCOPE: readonly CapabilityCode[] = [
-  "GENERAL_WELLNESS",
-  "WEIGHT_MANAGEMENT",
-  "ATHLETES",
-  "OLDER_ADULTS",
-  "WOMENS_HEALTH",
-  "MENS_HEALTH",
-  "BEGINNERS",
-  "PSYCHOTHERAPY",
-  "GENERAL_LONGEVITY",
-];
-
 /**
  * What each profession may claim. Providers cannot be trusted to self-limit, so
  * the allow-list is enforced server-side and drives which options render at all.
@@ -174,7 +162,19 @@ export const ALLOWED_CAPABILITIES_BY_PROFESSION: Record<
 > = {
   PERSONAL_TRAINER: FITNESS_SCOPE,
   STRENGTH_CONDITIONING_COACH: FITNESS_SCOPE,
-  SPORTS_PERFORMANCE_COACH: FITNESS_SCOPE,
+
+  // Trained for clinical and metabolic populations, which is why this reaches
+  // further than the fitness scope — but not into diagnosis.
+  EXERCISE_PHYSIOLOGIST: [
+    ...FITNESS_SCOPE,
+    "OLDER_ADULTS",
+    "METABOLIC_HEALTH",
+    "MOBILITY_LIMITATION",
+    "POST_REHAB_STRENGTH",
+    "DEXA_BONE_HEALTH",
+    "GENERAL_LONGEVITY",
+  ],
+
   HEALTH_WELLNESS_COACH: WELLNESS_COACH_SCOPE,
   NUTRITION_COACH: NUTRITION_COACH_SCOPE,
 
@@ -216,13 +216,6 @@ export const ALLOWED_CAPABILITIES_BY_PROFESSION: Record<
     "POST_REHAB_STRENGTH",
   ],
 
-  LMHC: MENTAL_HEALTH_SCOPE,
-  LSMHC: MENTAL_HEALTH_SCOPE,
-  LMFT: MENTAL_HEALTH_SCOPE,
-  LICSW: MENTAL_HEALTH_SCOPE,
-  LCSW: MENTAL_HEALTH_SCOPE,
-  PSYCHOLOGIST: MENTAL_HEALTH_SCOPE,
-
   PHYSICIAN: [...CLINICAL_MEDICAL_SCOPE, "INJURY_DIAGNOSIS"],
   NURSE_PRACTITIONER: CLINICAL_MEDICAL_SCOPE,
   PHYSICIAN_ASSISTANT: CLINICAL_MEDICAL_SCOPE,
@@ -233,25 +226,39 @@ export const ALLOWED_CAPABILITIES_BY_PROFESSION: Record<
   OTHER: ["GENERAL_WELLNESS", "BEGINNERS", "GENERAL_LONGEVITY"],
 };
 
+/**
+ * What a professional may claim, across every profession they hold.
+ *
+ * The union is the right operation here: a personal trainer who is also a
+ * dietitian may legitimately claim medical nutrition therapy, because the
+ * dietitian licence is what permits it. Whether they have actually proven that
+ * licence is a separate question, answered by the readiness engine.
+ */
 export function allowedCapabilities(
-  professionType: ProfessionType,
+  professionTypes: readonly ProfessionType[],
 ): readonly CapabilityCode[] {
-  return ALLOWED_CAPABILITIES_BY_PROFESSION[professionType] ?? [];
+  const allowed = new Set<CapabilityCode>();
+  for (const professionType of professionTypes) {
+    for (const code of ALLOWED_CAPABILITIES_BY_PROFESSION[professionType] ?? []) {
+      allowed.add(code);
+    }
+  }
+  return [...allowed];
 }
 
 export function isCapabilityAllowed(
-  professionType: ProfessionType,
+  professionTypes: readonly ProfessionType[],
   code: string,
 ): boolean {
-  return (allowedCapabilities(professionType) as readonly string[]).includes(code);
+  return (allowedCapabilities(professionTypes) as readonly string[]).includes(code);
 }
 
 /** Drop anything outside scope. Applied server-side before any write. */
 export function filterAllowedCapabilities(
-  professionType: ProfessionType,
+  professionTypes: readonly ProfessionType[],
   codes: string[],
 ): CapabilityCode[] {
   return codes.filter((c) =>
-    isCapabilityAllowed(professionType, c),
+    isCapabilityAllowed(professionTypes, c),
   ) as CapabilityCode[];
 }

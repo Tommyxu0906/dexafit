@@ -160,7 +160,7 @@ export async function getApplicationBundle(
 export function toReadinessInput(bundle: ApplicationBundle, jurisdictionState: string) {
   return {
     profile: {
-      professionType: bundle.profile.profession_type,
+      professionTypes: bundle.profile.profession_types,
       legalFirstName: bundle.profile.legal_first_name,
       legalLastName: bundle.profile.legal_last_name,
       displayName: bundle.profile.display_name,
@@ -170,9 +170,6 @@ export function toReadinessInput(bundle: ApplicationBundle, jurisdictionState: s
       yearsExperience: bundle.profile.years_experience,
       languages: bundle.profile.languages,
       profilePhotoDocumentId: bundle.profile.profile_photo_document_id,
-      hspCertified: bundle.profile.hsp_certified,
-      supervisorName: bundle.profile.supervisor_name,
-      supervisorLicenseNumber: bundle.profile.supervisor_license_number,
     },
     applicationStatus: bundle.application.status,
     credentials: bundle.credentials.map((c) => ({

@@ -109,7 +109,7 @@ function buildBundle(overrides: {
       legal_first_name: "Maya",
       legal_last_name: "Reynolds",
       display_name: "Coach Maya",
-      profession_type: "PERSONAL_TRAINER",
+      profession_types: ["PERSONAL_TRAINER"] as const,
       professional_title: "CPT",
       bio: "x".repeat(150),
       years_experience: 8,
@@ -159,6 +159,7 @@ function buildBundle(overrides: {
       {
         id: "cred-1",
         professional_id: "prof-1",
+        requirement_key: "PERSONAL_TRAINER:NATIONAL_CERTIFICATION",
         credential_type: "NATIONAL_CERTIFICATION",
         credential_name: "NASM CPT",
         credential_number: "1",
@@ -179,6 +180,7 @@ function buildBundle(overrides: {
       {
         id: "cred-2",
         professional_id: "prof-1",
+        requirement_key: "CPR_AED",
         credential_type: "CPR_AED",
         credential_name: "CPR/AED",
         credential_number: "2",

@@ -54,7 +54,12 @@ export const aboutYouSchema = z.object({
   email: z.string().trim().email("Enter a valid email"),
   phone,
   professionalTitle: z.string().trim().min(1, "Required").max(120),
-  professionType: z.enum(PROFESSION_TYPES),
+  // A professional may hold several qualifications at once; the required
+  // credentials are the union across all of them.
+  professionTypes: z
+    .array(z.enum(PROFESSION_TYPES))
+    .min(1, "Select at least one")
+    .max(PROFESSION_TYPES.length),
   yearsExperience: z.coerce.number().int().min(0, "Must be 0 or more").max(80),
   bio: z
     .string()
@@ -106,6 +111,7 @@ export type PracticeInput = z.infer<typeof practiceSchema>;
 export const credentialSchema = z.object({
   id: z.string().uuid().optional(),
   credentialType: z.enum(CREDENTIAL_TYPES),
+  requirementKey: requiredText("Which requirement this satisfies is missing"),
   credentialName: z.string().trim().min(1, "Required").max(200),
   credentialNumber: optionalText,
   issuingAuthority: optionalText,
@@ -120,12 +126,7 @@ export type CredentialInput = z.infer<typeof credentialSchema>;
 
 export const credentialExtrasSchema = z.object({
   holdsRdRdn: z.boolean().optional(),
-  hspCertified: z.boolean().optional(),
   aprnCategory: z.enum(APRN_CATEGORIES).optional(),
-  supervisorName: optionalText,
-  supervisorLicenseType: optionalText,
-  supervisorLicenseNumber: optionalText,
-  supervisingOrganization: optionalText,
   scopeAcknowledged: z.boolean().optional(),
 });
 

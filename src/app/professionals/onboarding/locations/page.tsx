@@ -9,7 +9,7 @@ export default async function LocationsStepPage() {
 
   return (
     <LocationsStep
-      professionType={profile.profession_type}
+      professionTypes={profile.profession_types}
       locations={bundle?.locations ?? []}
       jurisdictions={bundle?.jurisdictions ?? []}
       credentials={bundle?.credentials ?? []}

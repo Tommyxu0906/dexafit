@@ -15,7 +15,7 @@ export default async function CredentialsStepPage() {
   const { profile } = await getOrCreateProfessional(user.id);
   const bundle = await getApplicationBundle(profile.id);
 
-  if (!profile.profession_type || !bundle) {
+  if (profile.profession_types.length === 0 || !bundle) {
     return (
       <div className="flex flex-col gap-6">
         <SectionHeading title="Credentials" />
@@ -36,7 +36,7 @@ export default async function CredentialsStepPage() {
   }
 
   const jurisdiction = primaryJurisdiction(bundle) || DEFAULT_STATE;
-  const requirements = getRequirements(profile.profession_type, jurisdiction);
+  const requirements = getRequirements(profile.profession_types, jurisdiction);
 
   return (
     <CredentialsStep
