@@ -457,5 +457,94 @@ select assert(
   ),
   'every SECURITY DEFINER function pins pg_temp in its search_path');
 
+-- ---------------------------------------------------------------------------
+-- The expiry-warning job
+-- ---------------------------------------------------------------------------
+--
+-- The job runs with no user session, so it cannot pass RLS. Rather than hand
+-- the deployment a service_role key that owns the database, two SECURITY
+-- DEFINER functions are the only elevated surface and both check a shared
+-- secret. These assertions hold that arrangement in place.
+
+reset role;
+
+-- A known secret for the length of this transaction; the rollback restores the
+-- real one.
+insert into cron_secrets (name, secret) values ('expiry', 'test-secret-for-assertions')
+on conflict (name) do update set secret = excluded.secret;
+
+do $$
+begin
+  perform * from due_expiry_warnings('the-wrong-secret');
+  raise exception 'FAILED: the wrong secret was accepted';
+exception when sqlstate 'P0001' then
+  -- The refusal and the assertion above both raise P0001, so tell them apart
+  -- rather than swallowing our own failure.
+  if sqlerrm like 'FAILED:%' then
+    raise;
+  end if;
+  raise notice 'ok  the wrong secret is refused';
+end;
+$$;
+
+select assert(
+  not has_function_privilege('anon', 'expiry_cron_authorized(text)', 'EXECUTE'),
+  'the secret check is not reachable on its own');
+
+-- A credential inside the window, on a live application, is due exactly once.
+update professional_applications set status = 'APPROVED'
+ where id = '3333aaaa-0000-4000-8000-000000000001';
+
+update credentials
+   set expiration_date = current_date + 10, expiry_warning_sent_for = null
+ where id = '5555aaaa-0000-4000-8000-000000000001';
+update auth.users set email_confirmed_at = now()
+ where id = 'aaaa0000-0000-4000-8000-000000000001';
+
+select assert(
+  exists (
+    select 1 from due_expiry_warnings('test-secret-for-assertions')
+     where item_id = '5555aaaa-0000-4000-8000-000000000001'
+  ),
+  'a credential expiring inside the window is due for a warning');
+
+select mark_expiry_warnings_sent(
+  'test-secret-for-assertions',
+  array['5555aaaa-0000-4000-8000-000000000001']::uuid[],
+  '{}'::uuid[]);
+
+select assert(
+  not exists (
+    select 1 from due_expiry_warnings('test-secret-for-assertions')
+     where item_id = '5555aaaa-0000-4000-8000-000000000001'
+  ),
+  'a warned credential is not warned about again');
+
+-- Renewing moves the expiry, which has to re-arm the warning by itself. This is
+-- the property the whole design rests on: the column records *which* date was
+-- warned about, not merely that a warning happened.
+update credentials set expiration_date = current_date + 20
+ where id = '5555aaaa-0000-4000-8000-000000000001';
+
+select assert(
+  exists (
+    select 1 from due_expiry_warnings('test-secret-for-assertions')
+     where item_id = '5555aaaa-0000-4000-8000-000000000001'
+  ),
+  'renewing a credential re-arms its expiry warning');
+
+-- Something already lapsed is a different question — enforcement — and is not
+-- what this job is for.
+update credentials
+   set expiration_date = current_date - 5, expiry_warning_sent_for = null
+ where id = '5555aaaa-0000-4000-8000-000000000001';
+
+select assert(
+  not exists (
+    select 1 from due_expiry_warnings('test-secret-for-assertions')
+     where item_id = '5555aaaa-0000-4000-8000-000000000001'
+  ),
+  'an already-expired credential is not warned about');
+
 reset role;
 rollback;
