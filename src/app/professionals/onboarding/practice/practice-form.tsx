@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState, useState } from "react";
 import {
   Button,
@@ -16,7 +17,6 @@ import { idleState } from "@/lib/actions/state";
 import type { ProfessionalProfileRow } from "@/lib/data/types";
 import {
   DEFAULT_COUNTRY,
-  JOINING_AS,
   JOINING_AS_LABELS,
   SERVICE_MODES,
   SERVICE_MODE_LABELS,
@@ -43,9 +43,7 @@ export function PracticeForm({
   organization: OrganizationRow | null;
 }) {
   const [state, formAction, pending] = useActionState(savePractice, idleState);
-  const [joiningAs, setJoiningAs] = useState<JoiningAs>(
-    profile.joining_as ?? "INDIVIDUAL",
-  );
+  const joiningAs: JoiningAs = profile.joining_as ?? "INDIVIDUAL";
   const [serviceModes, setServiceModes] = useState<ServiceMode[]>(
     profile.service_modes?.length ? profile.service_modes : ["IN_PERSON"],
   );
@@ -69,20 +67,21 @@ export function PracticeForm({
       {state.message && !state.ok ? <Callout tone="danger">{state.message}</Callout> : null}
 
       <Card>
-        <Field label="Joining DexaFit as" htmlFor="joiningAs" required>
-          <Select
-            id="joiningAs"
-            name="joiningAs"
-            value={joiningAs}
-            onChange={(e) => setJoiningAs(e.target.value as JoiningAs)}
+        <input type="hidden" name="joiningAs" value={joiningAs} />
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 px-3 py-2 text-sm">
+          <span className="text-muted">
+            Joining as{" "}
+            <span className="font-medium text-ink">
+              {JOINING_AS_LABELS[joiningAs].toLowerCase()}
+            </span>
+          </span>
+          <Link
+            href="/professionals/onboarding/about"
+            className="text-xs font-semibold text-emerald-700 underline underline-offset-2"
           >
-            {JOINING_AS.map((option) => (
-              <option key={option} value={option}>
-                {JOINING_AS_LABELS[option]}
-              </option>
-            ))}
-          </Select>
-        </Field>
+            Change
+          </Link>
+        </div>
 
         <div className="mt-5 grid gap-5 sm:grid-cols-2">
           <Field label="Practice name" htmlFor="practiceName" error={errors.practiceName}>

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  aboutYouSchema,
   credentialSchema,
   practiceSchema,
   serviceOfferingSchema,
@@ -133,5 +134,52 @@ describe("business address", () => {
       insuranceNotes: null,
     });
     expect(result.success).toBe(true);
+  });
+});
+
+describe("step 1 asks the questions the rest of the wizard branches on", () => {
+  const about = (overrides: Record<string, unknown> = {}) => ({
+    legalFirstName: "Priya",
+    legalLastName: "Raghunathan",
+    displayName: "Priya Raghunathan",
+    email: "priya@example.com",
+    phone: "+16175550184",
+    professionalTitle: "PT, RD",
+    joiningAs: "INDIVIDUAL",
+    professionTypes: ["PHYSICAL_THERAPIST"],
+    yearsExperience: "16",
+    bio: "x".repeat(150),
+    languages: ["English"],
+    ...overrides,
+  });
+
+  it("accepts a complete step 1", () => {
+    expect(aboutYouSchema.safeParse(about()).success).toBe(true);
+  });
+
+  it("requires the individual-or-practice answer up front", () => {
+    // Asking this in step 2 meant step 1 could complete without knowing which
+    // later questions even apply.
+    const result = aboutYouSchema.safeParse(about({ joiningAs: undefined }));
+    expect(result.success).toBe(false);
+  });
+
+  it("refuses an empty profession selection rather than assuming one", () => {
+    const result = aboutYouSchema.safeParse(about({ professionTypes: [] }));
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts someone who practises more than one profession", () => {
+    const result = aboutYouSchema.safeParse(
+      about({ professionTypes: ["PHYSICAL_THERAPIST", "DIETITIAN_NUTRITIONIST"] }),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects a profession that is not on the list", () => {
+    // The mental-health professions were removed; a stale client must not be
+    // able to post one back.
+    const result = aboutYouSchema.safeParse(about({ professionTypes: ["LICSW"] }));
+    expect(result.success).toBe(false);
   });
 });

@@ -106,8 +106,17 @@ export type JoiningAs = (typeof JOINING_AS)[number];
 
 export const JOINING_AS_LABELS: Record<JoiningAs, string> = {
   INDIVIDUAL: "Individual professional",
-  ORGANIZATION_MEMBER: "Member of a practice / organization",
-  ORGANIZATION_OWNER: "Practice / organization owner",
+  ORGANIZATION_MEMBER: "Member of a practice or clinic",
+  ORGANIZATION_OWNER: "Practice or clinic owner",
+};
+
+/** Asked in step 1, because it decides what the rest of the wizard collects. */
+export const JOINING_AS_DESCRIPTIONS: Record<JoiningAs, string> = {
+  INDIVIDUAL: "You practise under your own name and hold your own insurance.",
+  ORGANIZATION_MEMBER:
+    "You work at a practice someone else owns. We will ask for its details.",
+  ORGANIZATION_OWNER:
+    "You own the practice. We will ask for its legal details and address.",
 };
 
 export const INSURANCE_TYPES = [

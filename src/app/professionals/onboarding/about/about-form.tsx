@@ -9,13 +9,21 @@ import {
   CheckboxRow,
   Field,
   Input,
+  RadioRow,
   SectionHeading,
   Textarea,
 } from "@/components/ui";
 import { saveAboutYou } from "@/lib/actions/onboarding";
 import { idleState } from "@/lib/actions/state";
 import type { ProfessionalProfileRow } from "@/lib/data/types";
-import { LANGUAGES, PROFESSION_LABELS, PROFESSION_TYPES } from "@/lib/domain/enums";
+import {
+  JOINING_AS,
+  JOINING_AS_DESCRIPTIONS,
+  JOINING_AS_LABELS,
+  LANGUAGES,
+  PROFESSION_LABELS,
+  PROFESSION_TYPES,
+} from "@/lib/domain/enums";
 
 export function AboutForm({
   profile,
@@ -95,6 +103,28 @@ export function AboutForm({
               required
             />
           </Field>
+          <div className="sm:col-span-2">
+            <Field
+              label="Are you joining as an individual or through a practice?"
+              required
+              hint="This decides what we ask for later — an individual holds their own insurance, a practice has its own legal details."
+              error={errors.joiningAs}
+            >
+              <div className="grid gap-2 sm:grid-cols-3">
+                {JOINING_AS.map((option) => (
+                  <RadioRow
+                    key={option}
+                    name="joiningAs"
+                    value={option}
+                    label={JOINING_AS_LABELS[option]}
+                    description={JOINING_AS_DESCRIPTIONS[option]}
+                    defaultChecked={(profile.joining_as ?? "INDIVIDUAL") === option}
+                  />
+                ))}
+              </div>
+            </Field>
+          </div>
+
           <div className="sm:col-span-2">
             <Field
               label="What do you do?"
