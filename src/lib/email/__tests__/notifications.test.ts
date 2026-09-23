@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readEmailConfig, type EmailEnv } from "../config";
 import { CONFIDENTIALITY_FOOTER, buildSubmissionNotification } from "../notifications";
+import {
+  buildExpiryWarning,
+  type ExpiringItemSummary,
+} from "../provider-notifications";
 import { sendEmail, type EmailMessage } from "../send";
 
 const VALID_ENV: EmailEnv = {
@@ -189,5 +193,97 @@ describe("sendEmail", () => {
     const result = await sendEmail(MESSAGE, VALID_ENV);
 
     expect(result.status).toBe("failed");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Expiry warnings
+// ---------------------------------------------------------------------------
+
+describe("buildExpiryWarning", () => {
+  const NOW = new Date("2026-09-23T10:00:00Z");
+  const item = (label: string, expirationDate: string): ExpiringItemSummary => ({
+    kind: "CREDENTIAL",
+    label,
+    expirationDate,
+  });
+
+  it("names the credential in the subject when there is only one", () => {
+    const message = buildExpiryWarning(
+      { providerName: "Priya", items: [item("Massachusetts PT license", "2026-10-05")] },
+      "https://app.dexafit.test",
+      "support@dexafit.test",
+      NOW,
+    );
+    expect(message.subject).toContain("Massachusetts PT license");
+    expect(message.subject).toContain("in 12 days");
+  });
+
+  it("counts them when there are several", () => {
+    const message = buildExpiryWarning(
+      {
+        providerName: "Priya",
+        items: [item("PT license", "2026-10-05"), item("CPR/AED", "2026-10-20")],
+      },
+      "https://app.dexafit.test",
+      undefined,
+      NOW,
+    );
+    expect(message.subject).toMatch(/^2 of your credentials/);
+  });
+
+  it("lists every item with its date", () => {
+    const message = buildExpiryWarning(
+      {
+        providerName: "Priya",
+        items: [item("PT license", "2026-10-05"), item("CPR/AED", "2026-10-20")],
+      },
+      "https://app.dexafit.test",
+      undefined,
+      NOW,
+    );
+    expect(message.text).toContain("PT license");
+    expect(message.text).toContain("2026-10-05");
+    expect(message.text).toContain("CPR/AED");
+    expect(message.text).toContain("2026-10-20");
+  });
+
+  it("sends the provider to the page where they can fix it", () => {
+    const message = buildExpiryWarning(
+      { providerName: "Priya", items: [item("PT license", "2026-10-05")] },
+      "https://app.dexafit.test",
+      undefined,
+      NOW,
+    );
+    expect(message.text).toContain(
+      "https://app.dexafit.test/professionals/onboarding/credentials",
+    );
+  });
+
+  it("promises no consequence, because none has been decided", () => {
+    // Delisting, a grace period, advance suspension — all still open. Telling a
+    // provider what will happen would be inventing policy.
+    const message = buildExpiryWarning(
+      { providerName: "Priya", items: [item("PT license", "2026-10-05")] },
+      "https://app.dexafit.test",
+      undefined,
+      NOW,
+    );
+    const body = `${message.subject} ${message.text}`.toLowerCase();
+    for (const word of ["suspend", "remove", "delist", "deactivat", "terminat"]) {
+      expect(body, `the copy threatens "${word}"`).not.toContain(word);
+    }
+  });
+
+  it("carries no credential numbers", () => {
+    const message = buildExpiryWarning(
+      { providerName: "Priya", items: [item("PT license", "2026-10-05")] },
+      "https://app.dexafit.test",
+      undefined,
+      NOW,
+    );
+    // Plain text only: the HTML carries CSS colours, which are digit runs that
+    // have nothing to do with what was disclosed.
+    expect(message.text).not.toMatch(/\b\d{5,}\b/);
   });
 });

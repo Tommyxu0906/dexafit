@@ -98,6 +98,7 @@ link.
 | `ADMIN_NOTIFICATION_EMAILS` | for email | Comma-separated |
 | `EMAIL_FROM` | after step 1 | Address on the verified domain |
 | `SUPPORT_EMAIL` | optional | Reply-to on provider email; defaults to the first admin address |
+| `EXPIRY_CRON_SECRET` | for the daily job | Must match the `cron_secrets` row; see below |
 | `SENTRY_DSN` | optional | Enables error forwarding; the app runs fine without it |
 
 `APP_URL` is refused in production if it is missing or points at localhost, so
@@ -113,7 +114,31 @@ Defaults work. The build needs no environment variables — every route is
 server-rendered on demand, so nothing reads Supabase or Resend configuration at
 build time, and CI verifies that by building with no environment file present.
 
-## 6. After deploying
+## 6. The daily expiry-warning job
+
+`vercel.json` schedules `/api/cron/expiry-warnings` once a day at 13:00 UTC.
+It emails providers whose credentials or insurance lapse within 30 days.
+
+It authenticates with a shared secret rather than the `service_role` key, so
+nothing that owns the database goes near the deployment. Set the same value in
+two places:
+
+```sql
+insert into cron_secrets (name, secret) values ('expiry', '<random>')
+  on conflict (name) do update set secret = excluded.secret;
+```
+
+and as `EXPIRY_CRON_SECRET` in Vercel. Generate it with `openssl rand -hex 32`.
+Unset in either place, the job refuses to run rather than running unprotected.
+
+- [ ] Secret set in the database and in Vercel, and they match.
+- [ ] `curl https://<domain>/api/cron/expiry-warnings` with no header returns 401.
+- [ ] With `Authorization: Bearer <secret>` it returns a JSON summary.
+
+> Vercel's Hobby plan runs cron jobs once per day, which is what this needs. A
+> plan change is not required for it.
+
+## 7. After deploying
 
 - [ ] `GET /api/health` returns `{"status":"ok"}` with all four checks true.
       `degraded` means something in the table above is missing; `down` means

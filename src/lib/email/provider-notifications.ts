@@ -1,3 +1,8 @@
+import {
+  EXPIRY_WARNING_DAYS,
+  describeTimeToExpiry,
+  type ExpiringItemKind,
+} from "../domain/expiry";
 import { readEmailConfig } from "./config";
 import { renderEmailBody } from "./layout";
 import { sendEmail, type EmailMessage, type SendResult } from "./send";
@@ -36,6 +41,7 @@ export type ProviderNotification = {
 };
 
 const STATUS_PAGE = "/professionals/onboarding/status";
+const CREDENTIALS_PAGE = "/professionals/onboarding/credentials";
 
 export function buildProviderNotification(
   input: ProviderNotification,
@@ -124,6 +130,94 @@ export async function notifyProvider(
     console.error(
       `[email] ${input.type} notification to the provider failed: ${result.reason}`,
     );
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Expiry warnings
+// ---------------------------------------------------------------------------
+
+export type ExpiringItemSummary = {
+  kind: ExpiringItemKind;
+  label: string;
+  expirationDate: string;
+};
+
+export type ExpiryWarning = {
+  providerName: string;
+  items: readonly ExpiringItemSummary[];
+};
+
+/**
+ * Advance notice that something is about to lapse.
+ *
+ * Labels and dates only — the same rule as every other provider email. A
+ * provider needs to know *which* credential to renew, not to be sent its number
+ * back. What happens when it does lapse is not stated, because that has not
+ * been decided; promising a consequence we have not agreed would be worse than
+ * saying nothing.
+ */
+export function buildExpiryWarning(
+  input: ExpiryWarning,
+  appUrl: string,
+  supportEmail: string | undefined,
+  now: Date,
+): Omit<EmailMessage, "to"> {
+  const soonest = [...input.items].sort((a, b) =>
+    a.expirationDate.localeCompare(b.expirationDate),
+  )[0];
+
+  const subject =
+    input.items.length === 1
+      ? `Your ${input.items[0].label} expires ${describeTimeToExpiry(soonest.expirationDate, now)}`
+      : `${input.items.length} of your credentials expire in the next ${EXPIRY_WARNING_DAYS} days`;
+
+  const { text, html } = renderEmailBody({
+    paragraphs: [
+      `Hi ${input.providerName},`,
+      input.items.length === 1
+        ? "One of the credentials on your DexaFit profile is coming up for renewal."
+        : "Some of the credentials on your DexaFit profile are coming up for renewal.",
+      "Once you have renewed, update the expiry date on your profile and upload the new document. We will verify it and nothing about your listing changes.",
+    ],
+    rows: input.items.map(
+      (item) =>
+        [
+          item.label,
+          `expires ${item.expirationDate} (${describeTimeToExpiry(item.expirationDate, now)})`,
+        ] as [string, string],
+    ),
+    cta: { label: "Update my credentials", url: `${appUrl}${CREDENTIALS_PAGE}` },
+    footer:
+      "If you have already renewed, no action is needed beyond updating the date on your profile.",
+  });
+
+  return { subject, text, html, replyTo: supportEmail };
+}
+
+export async function notifyProviderOfExpiry(
+  recipient: string,
+  input: ExpiryWarning,
+  now: Date = new Date(),
+): Promise<SendResult> {
+  const configResult = readEmailConfig();
+  if (!configResult.configured) {
+    console.warn(`[email] Expiry warning not sent: ${configResult.reason}`);
+    return { status: "skipped", reason: configResult.reason };
+  }
+
+  const message = buildExpiryWarning(
+    input,
+    configResult.config.appUrl,
+    configResult.config.supportEmail,
+    now,
+  );
+  const result = await sendEmail({ ...message, to: [recipient] });
+
+  if (result.status === "failed") {
+    console.error(`[email] Expiry warning failed: ${result.reason}`);
   }
 
   return result;
