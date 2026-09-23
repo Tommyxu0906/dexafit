@@ -106,6 +106,7 @@ describe("business address", () => {
   it("accepts a credential with no jurisdiction field rendered", () => {
     const result = credentialSchema.safeParse({
       credentialType: "CPR_AED",
+      requirementKey: "CPR_AED",
       credentialName: "CPR/AED",
       credentialNumber: null,
       issuingAuthority: null,

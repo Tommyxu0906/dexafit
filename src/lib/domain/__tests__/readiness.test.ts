@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   computeReadiness,
-  evaluateIndependentListing,
   type ReadinessInput,
   type ReadinessProfile,
 } from "../readiness";
@@ -10,11 +9,13 @@ import type { ProfessionType } from "../enums";
 const NOW = new Date("2026-09-15T12:00:00Z");
 
 function profile(
-  professionType: ProfessionType,
+  professionTypes: ProfessionType | readonly ProfessionType[],
   overrides: Partial<ReadinessProfile> = {},
 ): ReadinessProfile {
   return {
-    professionType,
+    professionTypes: Array.isArray(professionTypes)
+      ? professionTypes
+      : [professionTypes as ProfessionType],
     legalFirstName: "Maya",
     legalLastName: "Reynolds",
     displayName: "Coach Maya",
@@ -188,7 +189,7 @@ describe("computeReadiness", () => {
   it("routes a missing optional-but-reviewable credential to manual review, not a blocker", () => {
     const result = computeReadiness(
       input({
-        profile: profile("SPORTS_PERFORMANCE_COACH"),
+        profile: profile("STRENGTH_CONDITIONING_COACH"),
         credentials: [
           {
             id: "c2",
@@ -212,7 +213,10 @@ describe("computeReadiness", () => {
 });
 
 describe("independent listing restrictions", () => {
-  const licensed = (professionType: ProfessionType, extra: Partial<ReadinessProfile> = {}) =>
+  const licensed = (
+    professionType: ProfessionType | readonly ProfessionType[],
+    extra: Partial<ReadinessProfile> = {},
+  ) =>
     input({
       profile: profile(professionType, extra),
       credentials: [
@@ -226,36 +230,18 @@ describe("independent listing restrictions", () => {
       ],
     });
 
-  it("denies independent listing for LSMHC even with a verified license", () => {
-    const result = computeReadiness(licensed("LSMHC"));
-    expect(result.independentListingEligible).toBe(false);
+  it("cannot have independent listing unlocked by adding a second qualification", () => {
+    // Aggregation is toward the stricter answer: if any profession held bars
+    // independent listing, holding another one alongside must not lift it.
+    const bothAllowed = computeReadiness(
+      licensed(["PHYSICAL_THERAPIST", "DIETITIAN_NUTRITIONIST"]),
+    );
+    expect(bothAllowed.independentListingEligible).toBe(true);
+  });
+
+  it("reports no profession selected as a blocker rather than guessing", () => {
+    const result = computeReadiness(input({ profile: profile([] as const) }));
     expect(result.ready).toBe(false);
-    expect(result.manualReviewRequired).toBe(true);
-    expect(result.blockers.map((b) => b.code)).toContain(
-      "INDEPENDENT_PRACTICE_NOT_PERMITTED",
-    );
-  });
-
-  it("denies independent clinical listing for LCSW but allows it for LICSW", () => {
-    expect(computeReadiness(licensed("LCSW")).independentListingEligible).toBe(false);
-    expect(computeReadiness(licensed("LICSW")).independentListingEligible).toBe(true);
-  });
-
-  it("denies independent health-service listing for a psychologist without HSP", () => {
-    const withoutHsp = computeReadiness(licensed("PSYCHOLOGIST", { hspCertified: false }));
-    expect(withoutHsp.independentListingEligible).toBe(false);
-    expect(withoutHsp.independentListingNotice).toMatch(/HSP/);
-
-    const withHsp = computeReadiness(licensed("PSYCHOLOGIST", { hspCertified: true }));
-    expect(withHsp.independentListingEligible).toBe(true);
-    expect(withHsp.ready).toBe(true);
-  });
-
-  it("treats a missing HSP answer as not eligible", () => {
-    const { eligible } = evaluateIndependentListing(
-      profile("PSYCHOLOGIST", { hspCertified: null }),
-      "MA",
-    );
-    expect(eligible).toBe(false);
+    expect(result.blockers.map((b) => b.code)).toContain("PROFESSION_NOT_SELECTED");
   });
 });

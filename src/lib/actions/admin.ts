@@ -343,9 +343,10 @@ export async function decideApplication(
           await notifyProvider(recipient.email, {
             type: notificationType,
             providerName,
-            professionLabel: bundle.profile.profession_type
-              ? PROFESSION_LABELS[bundle.profile.profession_type]
-              : null,
+            professionLabel:
+              bundle.profile.profession_types
+                .map((t) => PROFESSION_LABELS[t])
+                .join(", ") || null,
           });
         } catch (notifyError) {
           console.error(

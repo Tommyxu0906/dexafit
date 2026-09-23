@@ -6,10 +6,10 @@ import {
   Button,
   Callout,
   Card,
+  CheckboxRow,
   Field,
   Input,
   SectionHeading,
-  Select,
   Textarea,
 } from "@/components/ui";
 import { saveAboutYou } from "@/lib/actions/onboarding";
@@ -95,29 +95,26 @@ export function AboutForm({
               required
             />
           </Field>
-          <Field
-            label="Profession"
-            htmlFor="professionType"
-            required
-            hint="This determines which credentials we ask for next."
-            error={errors.professionType}
-          >
-            <Select
-              id="professionType"
-              name="professionType"
-              defaultValue={profile.profession_type ?? ""}
+          <div className="sm:col-span-2">
+            <Field
+              label="What do you do?"
               required
+              hint="Select everything you are qualified for. We will ask for the credentials each one needs — holding two qualifications means two sets of credentials, not one."
+              error={errors.professionTypes}
             >
-              <option value="" disabled>
-                Select your profession
-              </option>
-              {PROFESSION_TYPES.map((type) => (
-                <option key={type} value={type}>
-                  {PROFESSION_LABELS[type]}
-                </option>
-              ))}
-            </Select>
-          </Field>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {PROFESSION_TYPES.map((type) => (
+                  <CheckboxRow
+                    key={type}
+                    name="professionTypes"
+                    value={type}
+                    label={PROFESSION_LABELS[type]}
+                    defaultChecked={profile.profession_types.includes(type)}
+                  />
+                ))}
+              </div>
+            </Field>
+          </div>
           <Field label="Years of experience" htmlFor="yearsExperience" required error={errors.yearsExperience}>
             <Input
               id="yearsExperience"

@@ -68,14 +68,14 @@ export function CredentialsStep({
         .filter((r) => r.required)
         .map((requirement) => (
           <CredentialRequirementCard
-            key={`${requirement.credentialType}-${requirement.label}`}
+            key={requirement.key}
             requirement={requirement}
             jurisdiction={jurisdiction}
             credentials={credentials.filter(
-              (c) => c.credential_type === requirement.credentialType,
+              (c) => c.requirement_key === requirement.key,
             )}
             documents={documents}
-            error={errors[`credential.${requirement.credentialType}`]}
+            error={errors[`credential.${requirement.key}`]}
           />
         ))}
 
@@ -88,11 +88,11 @@ export function CredentialsStep({
           <div className="flex flex-col gap-4">
             {optionalRequirements.map((requirement) => (
               <CredentialRequirementCard
-                key={`${requirement.credentialType}-${requirement.label}`}
+                key={requirement.key}
                 requirement={requirement}
                 jurisdiction={jurisdiction}
                 credentials={credentials.filter(
-                  (c) => c.credential_type === requirement.credentialType,
+                  (c) => c.requirement_key === requirement.key,
                 )}
                 documents={documents}
                 bare
@@ -134,32 +134,6 @@ export function CredentialsStep({
           </Card>
         ) : null}
 
-        {requirements.extraQuestions.includes("HSP") ? (
-          <Card>
-            <Field
-              label="Are you Health Service Provider (HSP) certified?"
-              htmlFor="hspCertified"
-              required
-              hint="A psychologist license and HSP certification are different credentials. Independently offering health services requires HSP."
-              error={errors.hspCertified}
-            >
-              <Select
-                id="hspCertified"
-                name="hspCertified"
-                defaultValue={
-                  profile.hsp_certified === null ? "" : String(profile.hsp_certified)
-                }
-              >
-                <option value="" disabled>
-                  Select an answer
-                </option>
-                <option value="true">Yes</option>
-                <option value="false">No</option>
-              </Select>
-            </Field>
-          </Card>
-        ) : null}
-
         {requirements.extraQuestions.includes("APRN_CATEGORY") ? (
           <Card>
             <Field label="APRN category" htmlFor="aprnCategory" required error={errors.aprnCategory}>
@@ -178,57 +152,6 @@ export function CredentialsStep({
                 ))}
               </Select>
             </Field>
-          </Card>
-        ) : null}
-
-        {requirements.extraQuestions.includes("SUPERVISOR") ? (
-          <Card>
-            <p className="mb-4 text-sm font-semibold text-ink">Supervision</p>
-            <div className="grid gap-5 sm:grid-cols-2">
-              <Field label="Supervisor name" htmlFor="supervisorName" required error={errors.supervisorName}>
-                <Input
-                  id="supervisorName"
-                  name="supervisorName"
-                  defaultValue={profile.supervisor_name ?? ""}
-                />
-              </Field>
-              <Field
-                label="Supervisor license type"
-                htmlFor="supervisorLicenseType"
-                required
-                error={errors.supervisorLicenseType}
-              >
-                <Input
-                  id="supervisorLicenseType"
-                  name="supervisorLicenseType"
-                  placeholder="e.g. LICSW"
-                  defaultValue={profile.supervisor_license_type ?? ""}
-                />
-              </Field>
-              <Field
-                label="Supervisor license number"
-                htmlFor="supervisorLicenseNumber"
-                required
-                error={errors.supervisorLicenseNumber}
-              >
-                <Input
-                  id="supervisorLicenseNumber"
-                  name="supervisorLicenseNumber"
-                  defaultValue={profile.supervisor_license_number ?? ""}
-                />
-              </Field>
-              <Field
-                label="Clinical / practice organization"
-                htmlFor="supervisingOrganization"
-                error={errors.supervisingOrganization}
-              >
-                <Input
-                  id="supervisingOrganization"
-                  name="supervisingOrganization"
-                  defaultValue={profile.supervising_organization ?? ""}
-                />
-              </Field>
-            </div>
           </Card>
         ) : null}
 

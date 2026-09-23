@@ -9,7 +9,7 @@ export default async function WhoYouHelpStep() {
   const { profile } = await getOrCreateProfessional(user.id);
   const bundle = await getApplicationBundle(profile.id);
 
-  if (!profile.profession_type) {
+  if (profile.profession_types.length === 0) {
     return (
       <div className="flex flex-col gap-6">
         <SectionHeading title="Who you help" />
@@ -31,7 +31,7 @@ export default async function WhoYouHelpStep() {
 
   return (
     <CapabilitiesForm
-      professionType={profile.profession_type}
+      professionTypes={profile.profession_types}
       selected={(bundle?.capabilities ?? []).map((c) => c.capability_code)}
     />
   );

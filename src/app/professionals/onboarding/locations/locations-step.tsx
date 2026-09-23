@@ -34,12 +34,12 @@ import {
 import { getRequirements } from "@/lib/domain/requirements";
 
 export function LocationsStep({
-  professionType,
+  professionTypes,
   locations,
   jurisdictions,
   credentials,
 }: {
-  professionType: ProfessionType | null;
+  professionTypes: readonly ProfessionType[];
   locations: ServiceLocationRow[];
   jurisdictions: JurisdictionRow[];
   credentials: CredentialRow[];
@@ -58,11 +58,10 @@ export function LocationsStep({
       .filter(Boolean),
   );
 
-  const needsLicense = professionType
-    ? getRequirements(professionType, DEFAULT_STATE).credentials.some(
-        (c) => c.required && c.legalRequirement,
-      )
-    : false;
+  const needsLicense = getRequirements(
+    professionTypes,
+    DEFAULT_STATE,
+  ).credentials.some((c) => c.required && c.legalRequirement);
 
   const unlicensedStates = needsLicense
     ? locations.map((l) => l.state).filter((s) => !licensedStates.has(s))

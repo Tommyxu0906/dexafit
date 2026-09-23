@@ -15,7 +15,7 @@ describe("capability scope enforcement", () => {
       "FAT_LOSS",
       "SPORTS_PERFORMANCE",
     ]) {
-      expect(isCapabilityAllowed("PERSONAL_TRAINER", code)).toBe(true);
+      expect(isCapabilityAllowed(["PERSONAL_TRAINER"], code)).toBe(true);
     }
   });
 
@@ -27,33 +27,33 @@ describe("capability scope enforcement", () => {
       "MEDICAL_DIAGNOSIS",
       "MEDICAL_NUTRITION_THERAPY",
     ]) {
-      expect(isCapabilityAllowed("PERSONAL_TRAINER", code)).toBe(false);
+      expect(isCapabilityAllowed(["PERSONAL_TRAINER"], code)).toBe(false);
     }
   });
 
   it("never offers medical nutrition therapy or disease diagnosis to a nutrition coach", () => {
-    expect(isCapabilityAllowed("NUTRITION_COACH", "MEDICAL_NUTRITION_THERAPY")).toBe(
+    expect(isCapabilityAllowed(["NUTRITION_COACH"], "MEDICAL_NUTRITION_THERAPY")).toBe(
       false,
     );
-    expect(isCapabilityAllowed("NUTRITION_COACH", "DIAGNOSE_METABOLIC_DISEASE")).toBe(
+    expect(isCapabilityAllowed(["NUTRITION_COACH"], "DIAGNOSE_METABOLIC_DISEASE")).toBe(
       false,
     );
   });
 
   it("allows medical nutrition therapy for a licensed dietitian", () => {
     expect(
-      isCapabilityAllowed("DIETITIAN_NUTRITIONIST", "MEDICAL_NUTRITION_THERAPY"),
+      isCapabilityAllowed(["DIETITIAN_NUTRITIONIST"], "MEDICAL_NUTRITION_THERAPY"),
     ).toBe(true);
   });
 
   it("allows physical therapy only for a physical therapist", () => {
-    expect(isCapabilityAllowed("PHYSICAL_THERAPIST", "PHYSICAL_THERAPY")).toBe(true);
-    expect(isCapabilityAllowed("ATHLETIC_TRAINER", "PHYSICAL_THERAPY")).toBe(false);
-    expect(isCapabilityAllowed("HEALTH_WELLNESS_COACH", "PHYSICAL_THERAPY")).toBe(false);
+    expect(isCapabilityAllowed(["PHYSICAL_THERAPIST"], "PHYSICAL_THERAPY")).toBe(true);
+    expect(isCapabilityAllowed(["ATHLETIC_TRAINER"], "PHYSICAL_THERAPY")).toBe(false);
+    expect(isCapabilityAllowed(["HEALTH_WELLNESS_COACH"], "PHYSICAL_THERAPY")).toBe(false);
   });
 
   it("strips out-of-scope codes submitted by a client", () => {
-    const filtered = filterAllowedCapabilities("PERSONAL_TRAINER", [
+    const filtered = filterAllowedCapabilities(["PERSONAL_TRAINER"], [
       "MUSCLE_GAIN",
       "PSYCHOTHERAPY",
       "MEDICAL_DIAGNOSIS",
@@ -64,7 +64,30 @@ describe("capability scope enforcement", () => {
 
   it("defines an allow-list for every profession", () => {
     for (const profession of PROFESSION_TYPES) {
-      expect(allowedCapabilities(profession).length).toBeGreaterThan(0);
+      expect(allowedCapabilities([profession]).length).toBeGreaterThan(0);
     }
+  });
+
+  it("gives a professional the union of what each qualification permits", () => {
+    // A trainer who is also a dietitian may claim medical nutrition therapy,
+    // because the dietitian licence is what permits it.
+    expect(isCapabilityAllowed(["PERSONAL_TRAINER"], "MEDICAL_NUTRITION_THERAPY")).toBe(
+      false,
+    );
+    expect(
+      isCapabilityAllowed(
+        ["PERSONAL_TRAINER", "DIETITIAN_NUTRITIONIST"],
+        "MEDICAL_NUTRITION_THERAPY",
+      ),
+    ).toBe(true);
+  });
+
+  it("still refuses anything no held qualification permits", () => {
+    expect(
+      isCapabilityAllowed(
+        ["PERSONAL_TRAINER", "NUTRITION_COACH", "HEALTH_WELLNESS_COACH"],
+        "MEDICAL_DIAGNOSIS",
+      ),
+    ).toBe(false);
   });
 });

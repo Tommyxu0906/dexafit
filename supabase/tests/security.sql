@@ -43,12 +43,12 @@ insert into auth.users (id, email) values
 
 update app_users set role = 'ADMIN' where id = 'bbbb0000-0000-4000-8000-000000000002';
 
-insert into professional_profiles (id, user_id, profession_type, legal_first_name, legal_last_name, display_name)
+insert into professional_profiles (id, user_id, profession_types, legal_first_name, legal_last_name, display_name)
 values
   ('1111aaaa-0000-4000-8000-000000000001', 'aaaa0000-0000-4000-8000-000000000001',
-   'PERSONAL_TRAINER', 'Provider', 'One', 'Provider One'),
+   array['PERSONAL_TRAINER'], 'Provider', 'One', 'Provider One'),
   ('2222cccc-0000-4000-8000-000000000003', 'cccc0000-0000-4000-8000-000000000003',
-   'PERSONAL_TRAINER', 'Intruder', 'Three', 'Intruder Three');
+   array['PERSONAL_TRAINER'], 'Intruder', 'Three', 'Intruder Three');
 
 insert into professional_applications (id, professional_id)
 values ('3333aaaa-0000-4000-8000-000000000001', '1111aaaa-0000-4000-8000-000000000001');

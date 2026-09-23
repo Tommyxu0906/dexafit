@@ -4,10 +4,11 @@ import type {
   ProfessionType,
   VerificationStatus,
 } from "./enums";
-import { getRequirements, requiresHspForIndependentListing } from "./requirements";
+import { getRequirements } from "./requirements";
 
 export type ReadinessProfile = {
-  professionType: ProfessionType | null;
+  /** Every profession the professional practises; empty until step 1 is done. */
+  professionTypes: readonly ProfessionType[];
   legalFirstName?: string | null;
   legalLastName?: string | null;
   displayName?: string | null;
@@ -17,9 +18,6 @@ export type ReadinessProfile = {
   yearsExperience?: number | null;
   languages?: string[] | null;
   profilePhotoDocumentId?: string | null;
-  hspCertified?: boolean | null;
-  supervisorName?: string | null;
-  supervisorLicenseNumber?: string | null;
 };
 
 export type ReadinessCredential = {
@@ -98,7 +96,7 @@ function profileComplete(profile: ReadinessProfile): boolean {
       profile.email &&
       profile.phone &&
       profile.bio &&
-      profile.professionType &&
+      profile.professionTypes.length > 0 &&
       profile.profilePhotoDocumentId &&
       typeof profile.yearsExperience === "number" &&
       profile.yearsExperience >= 0 &&
@@ -110,19 +108,23 @@ function profileComplete(profile: ReadinessProfile): boolean {
 /**
  * Whether the professional may be listed practicing independently.
  *
- * Three Massachusetts rules are product rules, not admin discretion:
- *   LSMHC                    — supervised license, never independent
- *   LCSW                     — no independent clinical private practice (LICSW can)
- *   Psychologist without HSP — cannot independently offer health services
+ * No profession DexaFit lists today is barred from independent practice, but
+ * the rule stays because the restriction is a product rule rather than admin
+ * discretion: a supervised licence type, or listing only through an employing
+ * clinic, is decided here and not by whoever happens to be reviewing.
+ *
+ * Holding several professions cannot unlock this — `getRequirements` requires
+ * every one of them to allow independent listing.
  */
 export function evaluateIndependentListing(
   profile: ReadinessProfile,
   jurisdictionState: string,
 ): { eligible: boolean; notice?: string } {
-  const professionType = profile.professionType;
-  if (!professionType) return { eligible: false, notice: "No profession selected." };
+  if (profile.professionTypes.length === 0) {
+    return { eligible: false, notice: "No profession selected." };
+  }
 
-  const requirements = getRequirements(professionType, jurisdictionState);
+  const requirements = getRequirements(profile.professionTypes, jurisdictionState);
 
   if (!requirements.independentListingAllowed) {
     return {
@@ -130,14 +132,6 @@ export function evaluateIndependentListing(
       notice:
         requirements.restrictionNotice ??
         "This license type is not eligible for an independent marketplace listing.",
-    };
-  }
-
-  if (requiresHspForIndependentListing(professionType) && !profile.hspCertified) {
-    return {
-      eligible: false,
-      notice:
-        "A licensed psychologist without Health Service Provider (HSP) certification cannot independently offer health services.",
     };
   }
 
@@ -153,13 +147,13 @@ export function computeReadiness(input: ReadinessInput): ReadinessResult {
   const blockers: Blocker[] = [];
   const { profile, credentials, insurancePolicies, disclosures } = input;
 
-  if (!profile.professionType) {
+  if (profile.professionTypes.length === 0) {
     return {
       ready: false,
       blockers: [
         {
           code: "PROFESSION_NOT_SELECTED",
-          message: "Profession type has not been selected.",
+          message: "No profession has been selected.",
         },
       ],
       independentListingEligible: false,
@@ -167,7 +161,10 @@ export function computeReadiness(input: ReadinessInput): ReadinessResult {
     };
   }
 
-  const requirements = getRequirements(profile.professionType, input.jurisdictionState);
+  const requirements = getRequirements(
+    profile.professionTypes,
+    input.jurisdictionState,
+  );
 
   if (!profileComplete(profile)) {
     blockers.push({

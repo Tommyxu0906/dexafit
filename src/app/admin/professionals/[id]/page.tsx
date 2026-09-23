@@ -55,9 +55,11 @@ export default async function AdminProfessionalDetail({
   const { profile } = bundle;
   const jurisdiction = primaryJurisdiction(bundle);
   const readiness = computePreApprovalReadiness(toReadinessInput(bundle, jurisdiction));
-  const requirements = profile.profession_type
-    ? getRequirements(profile.profession_type, jurisdiction)
-    : null;
+  const professionLabels = profile.profession_types.map((t) => PROFESSION_LABELS[t]);
+  const requirements =
+    profile.profession_types.length > 0
+      ? getRequirements(profile.profession_types, jurisdiction)
+      : null;
 
   const { data: events, error: eventsError } = await supabase
     .from("application_review_events")
@@ -83,8 +85,8 @@ export default async function AdminProfessionalDetail({
                 `${profile.legal_first_name ?? ""} ${profile.legal_last_name ?? ""}`}
             </h1>
             <p className="mt-1 text-sm text-muted">
-              {profile.profession_type
-                ? PROFESSION_LABELS[profile.profession_type]
+              {professionLabels.length > 0
+                ? professionLabels.join(" · ")
                 : "No profession selected"}
               {profile.professional_title ? ` · ${profile.professional_title}` : ""}
             </p>
@@ -176,8 +178,7 @@ export default async function AdminProfessionalDetail({
             <h2 className="mb-1 text-sm font-bold text-ink">Credentials</h2>
             {requirements ? (
               <p className="mb-4 text-xs text-muted">
-                Required for {PROFESSION_LABELS[profile.profession_type!]} in {jurisdiction}
-                :{" "}
+                Required for {professionLabels.join(" + ")} in {jurisdiction}:{" "}
                 {requirements.credentials
                   .filter((c) => c.required)
                   .map((c) => `${c.label} (${c.legalRequirement ? "licensure" : "DexaFit policy"})`)

@@ -7,7 +7,7 @@ import { after } from "next/server";
 import { AGREEMENT_VERSION, ATTESTATION_TYPES } from "../domain/attestations";
 import { filterAllowedCapabilities } from "../domain/capabilities";
 import { DISCLOSURE_TYPES, PROFESSION_LABELS } from "../domain/enums";
-import { getRequirements } from "../domain/requirements";
+import { getRequirements, requirementKey } from "../domain/requirements";
 import {
   aboutYouSchema,
   attestationsSchema,
@@ -66,7 +66,7 @@ export async function saveAboutYou(
     email: formData.get("email"),
     phone: formData.get("phone"),
     professionalTitle: formData.get("professionalTitle"),
-    professionType: formData.get("professionType"),
+    professionTypes: formData.getAll("professionTypes"),
     yearsExperience: formData.get("yearsExperience"),
     bio: formData.get("bio"),
     languages: formData.getAll("languages"),
@@ -92,7 +92,7 @@ export async function saveAboutYou(
       email: value.email,
       phone: value.phone,
       professional_title: value.professionalTitle,
-      profession_type: value.professionType,
+      profession_types: value.professionTypes,
       years_experience: value.yearsExperience,
       bio: value.bio,
       languages: value.languages,
@@ -245,11 +245,11 @@ export async function saveCredential(
   // Refuse to store a credential that is missing documentation it requires.
   // Saving it anyway strands the uploaded file with nothing pointing at it and
   // hides the problem until the final submit.
-  if (profile.profession_type) {
+  if (profile.profession_types.length > 0) {
     const requirement = getRequirements(
-      profile.profession_type,
+      profile.profession_types,
       formString(formData.get("jurisdictionState")) ?? value.jurisdictionState ?? "MA",
-    ).credentials.find((c) => c.credentialType === value.credentialType);
+    ).credentials.find((c) => c.key === value.requirementKey);
 
     if (requirement?.requiresDocument && !value.documentId) {
       return failure(
@@ -328,14 +328,7 @@ export async function saveCredentialsStep(
 
   const parsed = credentialExtrasSchema.safeParse({
     holdsRdRdn: formData.has("holdsRdRdn") ? formBoolean(formData.get("holdsRdRdn")) : undefined,
-    hspCertified: formData.has("hspCertified")
-      ? formBoolean(formData.get("hspCertified"))
-      : undefined,
     aprnCategory: formString(formData.get("aprnCategory")),
-    supervisorName: formData.get("supervisorName"),
-    supervisorLicenseType: formData.get("supervisorLicenseType"),
-    supervisorLicenseNumber: formData.get("supervisorLicenseNumber"),
-    supervisingOrganization: formData.get("supervisingOrganization"),
     scopeAcknowledged: formBoolean(formData.get("scopeAcknowledged")),
   });
 
@@ -344,11 +337,13 @@ export async function saveCredentialsStep(
   }
 
   const value = parsed.data;
-  const professionType = profile.profession_type;
-  if (!professionType) return failure("Select your profession in step 1 first.");
+  const professionTypes = profile.profession_types;
+  if (professionTypes.length === 0) {
+    return failure("Select what you do in step 1 first.");
+  }
 
   const jurisdiction = formString(formData.get("jurisdictionState")) ?? "MA";
-  const requirements = getRequirements(professionType, jurisdiction);
+  const requirements = getRequirements(professionTypes, jurisdiction);
 
   // Server-side enforcement of the profession-specific questions; the client
   // form can be bypassed.
@@ -357,16 +352,8 @@ export async function saveCredentialsStep(
   if (requirements.extraQuestions.includes("RD_RDN") && value.holdsRdRdn === undefined) {
     fieldErrors.holdsRdRdn = "Please answer this question";
   }
-  if (requirements.extraQuestions.includes("HSP") && value.hspCertified === undefined) {
-    fieldErrors.hspCertified = "Please answer this question";
-  }
   if (requirements.extraQuestions.includes("APRN_CATEGORY") && !value.aprnCategory) {
     fieldErrors.aprnCategory = "Select your APRN category";
-  }
-  if (requirements.extraQuestions.includes("SUPERVISOR")) {
-    if (!value.supervisorName) fieldErrors.supervisorName = "Required";
-    if (!value.supervisorLicenseType) fieldErrors.supervisorLicenseType = "Required";
-    if (!value.supervisorLicenseNumber) fieldErrors.supervisorLicenseNumber = "Required";
   }
   if (requirements.scopeAcknowledgement && !value.scopeAcknowledged) {
     fieldErrors.scopeAcknowledged = "You must acknowledge your scope of practice";
@@ -376,10 +363,9 @@ export async function saveCredentialsStep(
   const credentials = bundle?.credentials ?? [];
   for (const requirement of requirements.credentials) {
     if (!requirement.required || requirement.manualReviewIfMissing) continue;
-    const present = credentials.some((c) => c.credential_type === requirement.credentialType);
+    const present = credentials.some((c) => c.requirement_key === requirement.key);
     if (!present) {
-      fieldErrors[`credential.${requirement.credentialType}`] =
-        `${requirement.label} is required`;
+      fieldErrors[`credential.${requirement.key}`] = `${requirement.label} is required`;
     }
   }
 
@@ -392,12 +378,7 @@ export async function saveCredentialsStep(
     .from("professional_profiles")
     .update({
       holds_rd_rdn: value.holdsRdRdn ?? null,
-      hsp_certified: value.hspCertified ?? null,
       aprn_category: value.aprnCategory ?? null,
-      supervisor_name: value.supervisorName ?? null,
-      supervisor_license_type: value.supervisorLicenseType ?? null,
-      supervisor_license_number: value.supervisorLicenseNumber ?? null,
-      supervising_organization: value.supervisingOrganization ?? null,
     })
     .eq("id", professionalId);
 
@@ -563,7 +544,9 @@ export async function saveCapabilities(
   formData: FormData,
 ): Promise<ActionState> {
   const { professionalId, profile, application } = await getOnboardingContext();
-  if (!profile.profession_type) return failure("Select your profession in step 1 first.");
+  if (profile.profession_types.length === 0) {
+    return failure("Select what you do in step 1 first.");
+  }
 
   const parsed = capabilitiesSchema.safeParse({
     clientPopulations: formData.getAll("clientPopulations"),
@@ -577,7 +560,7 @@ export async function saveCapabilities(
   // Scope enforcement: anything outside the profession's allow-list is dropped,
   // even if the client submitted it.
   const submitted = [...parsed.data.clientPopulations, ...parsed.data.dexaCapabilities];
-  const allowed = filterAllowedCapabilities(profile.profession_type, submitted);
+  const allowed = filterAllowedCapabilities(profile.profession_types, submitted);
 
   if (allowed.length === 0) {
     return failure("Select at least one capability within your scope of practice.");
@@ -741,10 +724,10 @@ export async function saveLocation(
 
   // Mirror the location into a service jurisdiction, linked to a license held in
   // that state when one exists. This is the hook nationwide expansion builds on.
-  if (profile.profession_type) {
+  if (profile.profession_types.length > 0) {
     const { data: credentials, error: credentialsError } = await supabase
       .from("credentials")
-      .select("id, credential_type, jurisdiction_state")
+      .select("id, requirement_key, credential_type, jurisdiction_state")
       .eq("professional_id", professionalId);
 
     // A failed read here would silently mirror the location with no licence
@@ -758,28 +741,28 @@ export async function saveLocation(
       });
     }
 
-    const licenseInState = credentials?.find(
-      (c) =>
-        (c.credential_type === "STATE_LICENSE" ||
-          c.credential_type === "RN_LICENSE" ||
-          c.credential_type === "APRN_AUTHORIZATION") &&
-        c.jurisdiction_state === value.state,
-    );
+    // One row per profession per state: a physical therapist who is also a
+    // dietitian is authorised in Massachusetts by two different licences, and
+    // each row has to point at its own.
+    const rows = profile.profession_types.map((professionType) => {
+      const licenceKey = requirementKey(professionType, "STATE_LICENSE");
+      const licence = credentials?.find(
+        (c) => c.requirement_key === licenceKey && c.jurisdiction_state === value.state,
+      );
+      return {
+        professional_id: professionalId,
+        country: value.country,
+        state: value.state,
+        profession_type: professionType,
+        credential_id: licence?.id ?? null,
+        virtual_allowed: value.serviceMode !== "IN_PERSON",
+        in_person_allowed: value.serviceMode !== "VIRTUAL",
+      };
+    });
 
     const { error: jurisdictionError } = await supabase
       .from("professional_service_jurisdictions")
-      .upsert(
-        {
-          professional_id: professionalId,
-          country: value.country,
-          state: value.state,
-          profession_type: profile.profession_type,
-          credential_id: licenseInState?.id ?? null,
-          virtual_allowed: value.serviceMode !== "IN_PERSON",
-          in_person_allowed: value.serviceMode !== "VIRTUAL",
-        },
-        { onConflict: "professional_id,country,state" },
-      );
+      .upsert(rows, { onConflict: "professional_id,country,state,profession_type" });
 
     if (jurisdictionError) {
       return failure(
@@ -899,10 +882,12 @@ export async function submitApplication(
 
   const bundle = await getApplicationBundle(professionalId);
   if (!bundle) return failure("Application not found.");
-  if (!profile.profession_type) return failure("Select your profession in step 1 first.");
+  if (profile.profession_types.length === 0) {
+    return failure("Select what you do in step 1 first.");
+  }
 
   const jurisdiction = primaryJurisdiction(bundle);
-  const requirements = getRequirements(profile.profession_type, jurisdiction);
+  const requirements = getRequirements(profile.profession_types, jurisdiction);
 
   // Submission-time validation runs server-side regardless of what the wizard
   // allowed the client to do.
@@ -911,7 +896,7 @@ export async function submitApplication(
   for (const requirement of requirements.credentials) {
     if (!requirement.required || requirement.manualReviewIfMissing) continue;
     const credential = bundle.credentials.find(
-      (c) => c.credential_type === requirement.credentialType,
+      (c) => c.requirement_key === requirement.key,
     );
     if (!credential) {
       problems.push(`Missing required credential: ${requirement.label}.`);
@@ -976,8 +961,7 @@ export async function submitApplication(
   const manualReview =
     requirements.manualReviewRequired ||
     !requirements.independentListingAllowed ||
-    bundle.disclosures.some((d) => d.answer) ||
-    (profile.profession_type === "PSYCHOLOGIST" && !profile.hsp_certified);
+    bundle.disclosures.some((d) => d.answer);
 
   const submittedAt = new Date();
 
@@ -1023,7 +1007,9 @@ export async function submitApplication(
     profile.display_name ||
     [profile.legal_first_name, profile.legal_last_name].filter(Boolean).join(" ") ||
     "A new applicant";
-  const professionLabel = PROFESSION_LABELS[profile.profession_type];
+  const professionLabel = profile.profession_types
+    .map((t) => PROFESSION_LABELS[t])
+    .join(", ");
 
   const notification = {
     applicationId: application.id,
