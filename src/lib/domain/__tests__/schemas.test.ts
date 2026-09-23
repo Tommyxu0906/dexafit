@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   aboutYouSchema,
   credentialSchema,
+  insuranceSchema,
   practiceSchema,
   serviceOfferingSchema,
 } from "../schemas";
@@ -181,5 +182,50 @@ describe("step 1 asks the questions the rest of the wizard branches on", () => {
     // able to post one back.
     const result = aboutYouSchema.safeParse(about({ professionTypes: ["LICSW"] }));
     expect(result.success).toBe(false);
+  });
+});
+
+describe("insurance is required, its certificate is not", () => {
+  // DexaFit requires providers to carry cover but decided not to require the
+  // certificate: the COI upload was one of the heaviest asks in onboarding.
+  // What that means precisely is that the *declaration* stays mandatory and
+  // only the paperwork is optional, so the policy fields must not go soft.
+  const policy = {
+    insuranceType: "PROFESSIONAL_LIABILITY" as const,
+    carrierName: "Acme Mutual",
+    policyNumber: "POL-1",
+    effectiveDate: "2026-01-01",
+    expirationDate: "2027-01-01",
+  };
+
+  it("accepts a policy with no certificate attached", () => {
+    expect(insuranceSchema.safeParse(policy).success).toBe(true);
+    // An untouched file input arrives as undefined, not as "".
+    expect(
+      insuranceSchema.safeParse({ ...policy, certificateDocumentId: undefined }).success,
+    ).toBe(true);
+  });
+
+  it("still demands the details that make up the declaration", () => {
+    for (const field of [
+      "carrierName",
+      "policyNumber",
+      "effectiveDate",
+      "expirationDate",
+    ] as const) {
+      const result = insuranceSchema.safeParse({ ...policy, [field]: "" });
+      expect(result.success, `${field} became optional along with the certificate`).toBe(
+        false,
+      );
+    }
+  });
+
+  it("does not accept nonsense in place of a certificate id", () => {
+    // Optional must not degrade into unvalidated. A non-uuid here would mean a
+    // policy pointing at a document that cannot exist.
+    expect(
+      insuranceSchema.safeParse({ ...policy, certificateDocumentId: "not-a-uuid" })
+        .success,
+    ).toBe(false);
   });
 });

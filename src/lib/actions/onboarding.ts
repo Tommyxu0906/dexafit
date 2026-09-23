@@ -928,9 +928,6 @@ export async function submitApplication(
   if (requirements.insuranceRequired && bundle.insurancePolicies.length === 0) {
     problems.push("Professional liability insurance is required.");
   }
-  if (bundle.insurancePolicies.some((p) => !p.certificate_document_id)) {
-    problems.push("Upload a certificate of insurance for each policy.");
-  }
   if (bundle.capabilities.length === 0) {
     problems.push("Select who you help.");
   }
