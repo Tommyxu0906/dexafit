@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { authorizeCronRequest } from "@/lib/cron-auth";
 import { EXPIRY_WARNING_DAYS } from "@/lib/domain/expiry";
 import {
   notifyProviderOfExpiry,
@@ -35,21 +36,15 @@ type DueWarning = {
  * Authorization is a shared secret rather than the service_role key. The two
  * database functions this calls are the only elevated surface, and they check
  * the same secret themselves, so a caller who somehow reached this route
- * without it still gets nothing.
+ * without it still gets nothing. See `cron-auth` for why the variable has to be
+ * named CRON_SECRET.
  */
 export async function GET(request: Request) {
-  const secret = process.env.EXPIRY_CRON_SECRET?.trim();
-  if (!secret) {
-    return NextResponse.json(
-      { error: "EXPIRY_CRON_SECRET is not configured" },
-      { status: 503 },
-    );
+  const auth = authorizeCronRequest(request.headers.get("authorization"));
+  if (!auth.ok) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
-
-  const presented = request.headers.get("authorization")?.replace(/^Bearer /, "");
-  if (presented !== secret) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const { secret } = auth;
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("due_expiry_warnings", {

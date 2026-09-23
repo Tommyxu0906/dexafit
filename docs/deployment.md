@@ -98,7 +98,7 @@ link.
 | `ADMIN_NOTIFICATION_EMAILS` | for email | Comma-separated |
 | `EMAIL_FROM` | after step 1 | Address on the verified domain |
 | `SUPPORT_EMAIL` | optional | Reply-to on provider email; defaults to the first admin address |
-| `EXPIRY_CRON_SECRET` | for the daily job | Must match the `cron_secrets` row; see below |
+| `CRON_SECRET` | for the daily job | Name must be exactly this; must match the `cron_secrets` row; see below |
 | `SENTRY_DSN` | optional | Enables error forwarding; the app runs fine without it |
 
 `APP_URL` is refused in production if it is missing or points at localhost, so
@@ -128,15 +128,28 @@ insert into cron_secrets (name, secret) values ('expiry', '<random>')
   on conflict (name) do update set secret = excluded.secret;
 ```
 
-and as `EXPIRY_CRON_SECRET` in Vercel. Generate it with `openssl rand -hex 32`.
+and as `CRON_SECRET` in Vercel. Generate it with `openssl rand -hex 32`.
 Unset in either place, the job refuses to run rather than running unprotected.
 
+**The Vercel variable has to be named `CRON_SECRET` exactly.** Vercel attaches
+the `Authorization` header to a cron invocation only for that name; under any
+other name the request arrives bare and the job answers 401 every day. Vercel
+does not retry a failed invocation, and a 401 in the log looks like the guard
+working, so the mistake is invisible. `EXPIRY_CRON_SECRET` is still read as a
+fallback for invoking the job by hand.
+
 - [ ] Secret set in the database and in Vercel, and they match.
-- [ ] `curl https://<domain>/api/cron/expiry-warnings` with no header returns 401.
+- [ ] The Vercel variable is named `CRON_SECRET`, not anything else.
+- [ ] `curl https://<domain>/api/cron/expiry-warnings` with no header returns
+      401 (a 503 means the variable is missing from the deployment).
 - [ ] With `Authorization: Bearer <secret>` it returns a JSON summary.
+- [ ] After the first scheduled run, **Settings -> Cron Jobs -> View Logs**
+      shows a 200, not a 401.
 
 > Vercel's Hobby plan runs cron jobs once per day, which is what this needs. A
-> plan change is not required for it.
+> plan change is not required for it. Hobby invocations fire at some point
+> within the scheduled hour rather than on the minute, which does not matter for
+> a daily notice.
 
 ## 7. After deploying
 
