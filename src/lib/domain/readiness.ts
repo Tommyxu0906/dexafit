@@ -22,6 +22,13 @@ export type ReadinessProfile = {
 
 export type ReadinessCredential = {
   id: string;
+  /**
+   * Which requirement this credential satisfies. Matching on credentialType
+   * instead would let one document clear two requirements: a physical
+   * therapist who is also a dietitian holds two state licences, and one does
+   * not satisfy the other.
+   */
+  requirementKey: string;
   credentialType: CredentialType;
   verificationStatus: VerificationStatus;
   expirationDate?: string | null;
@@ -178,9 +185,7 @@ export function computeReadiness(input: ReadinessInput): ReadinessResult {
   for (const requirement of requirements.credentials) {
     if (!requirement.required) continue;
 
-    const matching = credentials.filter(
-      (c) => c.credentialType === requirement.credentialType,
-    );
+    const matching = credentials.filter((c) => c.requirementKey === requirement.key);
 
     if (matching.length === 0) {
       if (requirement.manualReviewIfMissing) {

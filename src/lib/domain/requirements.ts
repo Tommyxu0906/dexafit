@@ -38,6 +38,12 @@ export type CredentialRequirement = {
   requiresExpiration?: boolean;
   requiresDocument?: boolean;
   helpText?: string;
+  /**
+   * Overrides the "Issuing authority" prompt. A supervision agreement is not
+   * issued by anyone — the field holds the clinician who provides direction —
+   * and asking for an issuer there reads as a mistake.
+   */
+  issuerLabel?: string;
   exampleIssuers?: readonly string[];
   /**
    * When true, a missing credential routes to human review instead of blocking
@@ -293,6 +299,22 @@ const BASE_RULES: Record<ProfessionType, SingleProfessionRules> = {
     jurisdictionResearched: true,
   },
 
+  // Massachusetts constrains athletic trainers more tightly than any other
+  // profession on this list, in a way that cuts against an open marketplace.
+  //
+  // M.G.L. c. 112, § 23A defines an athletic trainer as one "who limits his
+  // practice to schools, teams or organizations with whom he is associated and
+  // who is under the direction of a physician or dentist duly registered in the
+  // commonwealth", and 259 CMR 4.02(2) repeats it: service is rendered "under
+  // the Direction of a Physician or Dentist with respect to the Athletes
+  // involved with the schools, teams or organizations with whom the Athletic
+  // Trainer is Associated".
+  //
+  // So a Massachusetts AT cannot simply take a member of the public who walked
+  // in from a scan. Whether DexaFit lists them at all is a product and legal
+  // decision, not one this file should make, so the rules route every AT
+  // application to a human with the restriction stated rather than silently
+  // approving or silently barring them.
   ATHLETIC_TRAINER: {
     professionType: "ATHLETIC_TRAINER",
     credentials: [
@@ -301,18 +323,47 @@ const BASE_RULES: Record<ProfessionType, SingleProfessionRules> = {
         credentialType: "NATIONAL_CERTIFICATION",
         label: "BOC certification",
         required: true,
-        legalRequirement: false,
+        // 259 CMR 4.03(1)(a) for initial licensure and 4.03(2)(b) for renewal:
+        // this is Massachusetts law, not a DexaFit preference.
+        legalRequirement: true,
         marketplaceRequirement: true,
         requiresNumber: true,
         requiresExpiration: true,
         requiresDocument: true,
         exampleIssuers: ["Board of Certification (BOC)"],
+        helpText:
+          "Massachusetts requires BOC certification in effect for the entire renewal period (259 CMR 4.03(2)(b)).",
+      },
+      {
+        // The same card a personal trainer uploads, but here the state requires
+        // it, so it keys as the shared CPR credential and is asked for once.
+        ...CPR_AED,
+        label: "Emergency Cardiac Care (CPR/AED) certification",
+        legalRequirement: true,
+        helpText:
+          "Massachusetts requires Emergency Cardiac Care certification in effect for the entire renewal period (259 CMR 4.03(2)(a)).",
+      },
+      {
+        credentialType: "SUPERVISION_AGREEMENT",
+        label: "Directing physician or dentist agreement",
+        required: true,
+        legalRequirement: true,
+        marketplaceRequirement: true,
+        requiresExpiration: false,
+        requiresDocument: true,
+        helpText:
+          "259 CMR 4.02(3) requires an agreed relationship with a physician or dentist who directs your practice, and written proof of it on request. Upload that written agreement.",
+        issuerLabel: "Directing physician or dentist",
       },
     ],
     insuranceRequired: true,
+    // Deliberately not set to false. Barring athletic trainers from the
+    // marketplace is a decision for DexaFit, not an inference from the statute.
     independentListingAllowed: true,
-    manualReviewRequired: false,
+    manualReviewRequired: true,
     extraQuestions: [],
+    restrictionNotice:
+      "Massachusetts licenses athletic trainers to work with athletes of the schools, teams or organizations they are associated with, under the direction of a physician or dentist (M.G.L. c. 112, § 23A; 259 CMR 4.02). A DexaFit reviewer will confirm how your practice fits this before your listing goes live.",
     jurisdictionResearched: true,
   },
 
@@ -391,12 +442,31 @@ const BASE_RULES: Record<ProfessionType, SingleProfessionRules> = {
         requiresDocument: true,
         exampleIssuers: ["NCCPA"],
       },
+      {
+        // 263 CMR 5.00: every professional activity of a PA is supervised by a
+        // physician, under written guidelines signed by both and reviewed
+        // annually. Unlike the athletic trainer restriction this does not
+        // confine them to a setting, so it is a document to collect rather than
+        // a reason to send the whole application to a human.
+        credentialType: "SUPERVISION_AGREEMENT",
+        label: "Supervising physician guidelines",
+        required: true,
+        legalRequirement: true,
+        marketplaceRequirement: true,
+        requiresExpiration: true,
+        requiresDocument: true,
+        helpText:
+          "263 CMR 5.00 requires written guidelines signed by you and your supervising physician, reviewed annually. Upload the current signed guidelines and give the review date as the expiration.",
+        issuerLabel: "Supervising physician",
+      },
       NPI_OPTIONAL,
     ],
     insuranceRequired: true,
     independentListingAllowed: true,
     manualReviewRequired: false,
     extraQuestions: [],
+    scopeAcknowledgement:
+      "I confirm that all of my professional activity is supervised by a physician licensed in this state, under current written guidelines as required by 263 CMR 5.00.",
     jurisdictionResearched: true,
   },
 
@@ -461,11 +531,20 @@ function stricter(
   return {
     ...a,
     required: a.required || b.required,
+    // These two describe *why* a credential is being asked for, and they merge
+    // for the same reason everything else here does. A CPR card is DexaFit
+    // policy for a personal trainer but Massachusetts law for an athletic
+    // trainer (259 CMR 4.03(2)(a)); someone who is both must not be told it is
+    // merely our policy because the trainer rule happened to be read first.
+    legalRequirement: a.legalRequirement || b.legalRequirement,
+    marketplaceRequirement: a.marketplaceRequirement || b.marketplaceRequirement,
     manualReviewIfMissing: Boolean(a.manualReviewIfMissing && b.manualReviewIfMissing),
     requiresDocument: a.requiresDocument || b.requiresDocument,
     requiresNumber: a.requiresNumber || b.requiresNumber,
     requiresExpiration: a.requiresExpiration || b.requiresExpiration,
     requiresJurisdiction: a.requiresJurisdiction || b.requiresJurisdiction,
+    // Keep whichever help text explains the stricter obligation.
+    helpText: a.legalRequirement ? a.helpText : (b.helpText ?? a.helpText),
   };
 }
 

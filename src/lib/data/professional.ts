@@ -174,6 +174,7 @@ export function toReadinessInput(bundle: ApplicationBundle, jurisdictionState: s
     applicationStatus: bundle.application.status,
     credentials: bundle.credentials.map((c) => ({
       id: c.id,
+      requirementKey: c.requirement_key,
       credentialType: c.credential_type,
       verificationStatus: c.verification_status,
       expirationDate: c.expiration_date,

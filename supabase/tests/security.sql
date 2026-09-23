@@ -53,9 +53,10 @@ values
 insert into professional_applications (id, professional_id)
 values ('3333aaaa-0000-4000-8000-000000000001', '1111aaaa-0000-4000-8000-000000000001');
 
-insert into credentials (id, professional_id, credential_type, credential_name, verification_status)
+insert into credentials (id, professional_id, credential_type, requirement_key, credential_name, verification_status)
 values ('5555aaaa-0000-4000-8000-000000000001', '1111aaaa-0000-4000-8000-000000000001',
-        'NATIONAL_CERTIFICATION', 'NASM CPT', 'UNVERIFIED');
+        'NATIONAL_CERTIFICATION', 'PERSONAL_TRAINER:NATIONAL_CERTIFICATION',
+        'NASM CPT', 'UNVERIFIED');
 
 insert into insurance_policies (id, professional_id, insurance_type, carrier_name, policy_number)
 values ('6666aaaa-0000-4000-8000-000000000001', '1111aaaa-0000-4000-8000-000000000001',
@@ -127,8 +128,8 @@ select assert(
   'provider cannot promote themselves to ADMIN');
 
 -- A pre-verified credential cannot be smuggled in at insert time either.
-insert into credentials (professional_id, credential_type, credential_name, verification_status)
-values ('1111aaaa-0000-4000-8000-000000000001', 'CPR_AED', 'Smuggled', 'VERIFIED');
+insert into credentials (professional_id, credential_type, requirement_key, credential_name, verification_status)
+values ('1111aaaa-0000-4000-8000-000000000001', 'CPR_AED', 'CPR_AED', 'Smuggled', 'VERIFIED');
 select assert(
   (select verification_status from credentials where credential_name = 'Smuggled') = 'UNVERIFIED',
   'provider cannot insert an already-verified credential');
@@ -224,8 +225,9 @@ select assert(
 
 do $$
 begin
-  insert into credentials (professional_id, credential_type, credential_name)
-  values ('2222cccc-0000-4000-8000-000000000003', 'STATE_LICENSE', 'planted');
+  insert into credentials (professional_id, credential_type, requirement_key, credential_name)
+  values ('2222cccc-0000-4000-8000-000000000003', 'STATE_LICENSE',
+          'PHYSICAL_THERAPIST:STATE_LICENSE', 'planted');
 exception when insufficient_privilege then
   null;
 end;
@@ -233,6 +235,39 @@ $$;
 select assert(
   (select count(*) from credentials where credential_name = 'planted') = 0,
   'provider cannot attach a credential to another professional');
+
+-- ---------------------------------------------------------------------------
+-- A credential must say which requirement it satisfies
+-- ---------------------------------------------------------------------------
+--
+-- Readiness matches on requirement_key and never on credential_type, because a
+-- physical therapist who is also a dietitian holds two state licences and
+-- neither satisfies the other. A row with no key would match no requirement at
+-- all, so the database refuses to store one.
+
+do $$
+begin
+  insert into credentials (professional_id, credential_type, credential_name)
+  values ('1111aaaa-0000-4000-8000-000000000001', 'CPR_AED', 'keyless');
+exception when not_null_violation then
+  null;
+end;
+$$;
+select assert(
+  (select count(*) from credentials where credential_name = 'keyless') = 0,
+  'a credential cannot be stored without a requirement_key');
+
+do $$
+begin
+  insert into credentials (professional_id, credential_type, requirement_key, credential_name)
+  values ('1111aaaa-0000-4000-8000-000000000001', 'CPR_AED', '   ', 'blank-key');
+exception when check_violation then
+  null;
+end;
+$$;
+select assert(
+  (select count(*) from credentials where credential_name = 'blank-key') = 0,
+  'a blank requirement_key is refused as well as a null one');
 
 -- ---------------------------------------------------------------------------
 -- Legitimate provider actions still work

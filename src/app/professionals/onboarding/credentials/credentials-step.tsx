@@ -369,7 +369,10 @@ function CredentialForm({
           />
         </Field>
 
-        <Field label="Issuing authority" htmlFor={`issuer-${credential?.id ?? "new"}`}>
+        <Field
+          label={requirement.issuerLabel ?? "Issuing authority"}
+          htmlFor={`issuer-${credential?.id ?? "new"}`}
+        >
           <Input
             id={`issuer-${credential?.id ?? "new"}`}
             name="issuingAuthority"

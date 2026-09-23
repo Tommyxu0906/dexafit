@@ -42,6 +42,7 @@ export const CREDENTIAL_TYPES = [
   "RN_LICENSE",
   "APRN_AUTHORIZATION",
   "HSP_CERTIFICATION",
+  "SUPERVISION_AGREEMENT",
   "NPI",
   "OTHER",
 ] as const;
@@ -56,6 +57,7 @@ export const CREDENTIAL_TYPE_LABELS: Record<CredentialType, string> = {
   RN_LICENSE: "RN license",
   APRN_AUTHORIZATION: "APRN authorization",
   HSP_CERTIFICATION: "Health Service Provider (HSP) certification",
+  SUPERVISION_AGREEMENT: "Supervising clinician agreement",
   NPI: "NPI",
   OTHER: "Other",
 };
