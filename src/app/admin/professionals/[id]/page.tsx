@@ -293,7 +293,13 @@ export default async function AdminProfessionalDetail({
                           }
                         />
                       </div>
-                    ) : null}
+                    ) : (
+                      <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                        No certificate on file. These details are the provider&apos;s
+                        own declaration — confirm them with the carrier before
+                        marking this verified.
+                      </p>
+                    )}
 
                     <div className="mt-4">
                       <InsuranceReview policyId={policy.id} applicationId={id} />

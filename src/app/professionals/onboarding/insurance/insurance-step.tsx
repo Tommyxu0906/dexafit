@@ -279,14 +279,13 @@ function InsuranceForm({
 
       <div className="mt-4">
         <Field
-          label="Certificate of insurance"
-          required
+          label="Certificate of insurance (optional)"
+          hint="Not required to submit. Attaching it lets us verify the policy without coming back to you."
           error={errors.certificateDocumentId}
         >
           <DocumentUpload
             name="certificateDocumentId"
             documentType="INSURANCE_CERTIFICATE"
-            required
             value={certificate}
             onChange={setCertificate}
           />

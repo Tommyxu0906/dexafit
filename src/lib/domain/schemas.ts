@@ -148,7 +148,14 @@ export const insuranceSchema = z.object({
   coverageAggregate: z.coerce.number().nonnegative().optional(),
   effectiveDate: z.string().trim().min(1, "Required"),
   expirationDate: z.string().trim().min(1, "Required"),
-  certificateDocumentId: z.string().uuid({ message: "Certificate of insurance is required" }),
+  // Carrier, policy number and dates stay required: entering them is the
+  // provider's declaration that the cover exists, and that declaration is what
+  // DexaFit relies on. The certificate itself is optional — uploading a COI was
+  // one of the heaviest asks in onboarding, and DexaFit chose to require the
+  // cover without requiring the paperwork. Anything verified without a
+  // certificate is verified against the provider's word, which is why the
+  // review screen says so rather than leaving the reviewer to notice.
+  certificateDocumentId: z.string().uuid().optional(),
 });
 
 export type InsuranceInput = z.infer<typeof insuranceSchema>;
