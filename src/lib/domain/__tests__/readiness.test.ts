@@ -36,12 +36,14 @@ function input(overrides: Partial<ReadinessInput> = {}): ReadinessInput {
     credentials: [
       {
         id: "c1",
+        requirementKey: "PERSONAL_TRAINER:NATIONAL_CERTIFICATION",
         credentialType: "NATIONAL_CERTIFICATION",
         verificationStatus: "VERIFIED",
         expirationDate: "2027-01-01",
       },
       {
         id: "c2",
+        requirementKey: "CPR_AED",
         credentialType: "CPR_AED",
         verificationStatus: "VERIFIED",
         expirationDate: "2027-01-01",
@@ -77,6 +79,7 @@ describe("computeReadiness", () => {
         credentials: [
           {
             id: "c1",
+            requirementKey: "PERSONAL_TRAINER:NATIONAL_CERTIFICATION",
             credentialType: "NATIONAL_CERTIFICATION",
             verificationStatus: "VERIFIED",
             expirationDate: "2027-01-01",
@@ -95,12 +98,14 @@ describe("computeReadiness", () => {
         credentials: [
           {
             id: "c1",
+            requirementKey: "PERSONAL_TRAINER:NATIONAL_CERTIFICATION",
             credentialType: "NATIONAL_CERTIFICATION",
             verificationStatus: "PENDING",
             expirationDate: "2027-01-01",
           },
           {
             id: "c2",
+            requirementKey: "CPR_AED",
             credentialType: "CPR_AED",
             verificationStatus: "VERIFIED",
             expirationDate: "2027-01-01",
@@ -118,12 +123,14 @@ describe("computeReadiness", () => {
         credentials: [
           {
             id: "c1",
+            requirementKey: "PERSONAL_TRAINER:NATIONAL_CERTIFICATION",
             credentialType: "NATIONAL_CERTIFICATION",
             verificationStatus: "VERIFIED",
             expirationDate: "2026-01-01",
           },
           {
             id: "c2",
+            requirementKey: "CPR_AED",
             credentialType: "CPR_AED",
             verificationStatus: "VERIFIED",
             expirationDate: "2027-01-01",
@@ -193,6 +200,7 @@ describe("computeReadiness", () => {
         credentials: [
           {
             id: "c2",
+            requirementKey: "CPR_AED",
             credentialType: "CPR_AED",
             verificationStatus: "VERIFIED",
             expirationDate: "2027-01-01",
@@ -222,6 +230,7 @@ describe("independent listing restrictions", () => {
       credentials: [
         {
           id: "c1",
+          requirementKey: "PHYSICAL_THERAPIST:STATE_LICENSE",
           credentialType: "STATE_LICENSE",
           verificationStatus: "VERIFIED",
           expirationDate: "2027-01-01",
@@ -243,5 +252,71 @@ describe("independent listing restrictions", () => {
     const result = computeReadiness(input({ profile: profile([] as const) }));
     expect(result.ready).toBe(false);
     expect(result.blockers.map((b) => b.code)).toContain("PROFESSION_NOT_SELECTED");
+  });
+});
+
+describe("one credential does not satisfy two requirements", () => {
+  // requirement_key exists for exactly this case, but readiness matched on
+  // credentialType until migration 0012. A physical therapist who is also a
+  // dietitian holds two separate state licences; neither board accepts the
+  // other's. Matching on type let one PT licence clear the dietitian
+  // requirement, which would approve someone to practise dietetics on the
+  // strength of a physical therapy licence.
+  const both = ["PHYSICAL_THERAPIST", "DIETITIAN_NUTRITIONIST"] as const;
+
+  const ptLicenceOnly = () =>
+    computeReadiness(
+      input({
+        profile: profile(both),
+        credentials: [
+          {
+            id: "pt",
+            requirementKey: "PHYSICAL_THERAPIST:STATE_LICENSE",
+            credentialType: "STATE_LICENSE",
+            verificationStatus: "VERIFIED",
+            expirationDate: "2027-01-01",
+            jurisdictionState: "MA",
+          },
+        ],
+      }),
+    );
+
+  it("still blocks on the dietitian licence when only the PT licence is on file", () => {
+    const blocked = ptLicenceOnly().blockers.filter(
+      (b) => b.code === "CREDENTIAL_MISSING",
+    );
+    expect(
+      blocked.some((b) => /dietitian/i.test(b.message)),
+      "a PT licence cleared the dietitian requirement",
+    ).toBe(true);
+  });
+
+  it("clears each requirement once its own licence is on file", () => {
+    const readiness = computeReadiness(
+      input({
+        profile: profile(both),
+        credentials: [
+          {
+            id: "pt",
+            requirementKey: "PHYSICAL_THERAPIST:STATE_LICENSE",
+            credentialType: "STATE_LICENSE",
+            verificationStatus: "VERIFIED",
+            expirationDate: "2027-01-01",
+            jurisdictionState: "MA",
+          },
+          {
+            id: "rd",
+            requirementKey: "DIETITIAN_NUTRITIONIST:STATE_LICENSE",
+            credentialType: "STATE_LICENSE",
+            verificationStatus: "VERIFIED",
+            expirationDate: "2027-01-01",
+            jurisdictionState: "MA",
+          },
+        ],
+      }),
+    );
+    expect(
+      readiness.blockers.filter((b) => b.code === "CREDENTIAL_MISSING"),
+    ).toHaveLength(0);
   });
 });

@@ -207,3 +207,107 @@ describe("requirementKey", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// Massachusetts rules, as researched against the statute and the CMRs.
+//
+// These assertions exist to stop a future edit quietly undoing a sourced legal
+// fact. Each one names its source; if a rule genuinely changes, the citation is
+// where to check before changing the expectation.
+// See docs/credentialing-massachusetts.md.
+// ---------------------------------------------------------------------------
+
+describe("Massachusetts athletic trainers", () => {
+  const at = () => getRequirements(["ATHLETIC_TRAINER"], MA);
+
+  it("states the practice-setting restriction rather than listing them as unrestricted", () => {
+    // M.G.L. c. 112, § 23A: an AT "limits his practice to schools, teams or
+    // organizations with whom he is associated and ... is under the direction
+    // of a physician or dentist". A marketplace listing must not imply they can
+    // take whoever walks in from a scan.
+    const notice = at().restrictionNotice ?? "";
+    expect(notice).toMatch(/schools, teams or organizations/i);
+    expect(notice).toMatch(/physician or dentist/i);
+  });
+
+  it("sends the application to a human instead of deciding eligibility itself", () => {
+    // Whether DexaFit lists athletic trainers at all is a product and legal
+    // call. Auto-approving and auto-barring are both wrong answers here.
+    expect(at().manualReviewRequired).toBe(true);
+  });
+
+  it("asks for written proof of the directing clinician relationship", () => {
+    // 259 CMR 4.02(3): the AT "must be able to provide written proof thereof
+    // upon request".
+    const agreement = at().credentials.find(
+      (c) => c.credentialType === "SUPERVISION_AGREEMENT",
+    );
+    expect(agreement?.required).toBe(true);
+    expect(agreement?.requiresDocument).toBe(true);
+    expect(agreement?.legalRequirement).toBe(true);
+  });
+
+  it("treats BOC and CPR as state law, not DexaFit preference", () => {
+    // 259 CMR 4.03(2): renewal requires proof of both "in effect for the entire
+    // renewal period". Labelling them as marketplace policy understates them.
+    for (const type of ["NATIONAL_CERTIFICATION", "CPR_AED"] as const) {
+      const credential = at().credentials.find((c) => c.credentialType === type);
+      expect(credential?.required, `${type} should be required`).toBe(true);
+      expect(credential?.legalRequirement, `${type} should be a legal requirement`).toBe(
+        true,
+      );
+    }
+  });
+});
+
+describe("Massachusetts physician assistants", () => {
+  const pa = () => getRequirements(["PHYSICIAN_ASSISTANT"], MA);
+
+  it("collects the written supervising-physician guidelines", () => {
+    // 263 CMR 5.00: guidelines signed by both and reviewed annually.
+    const agreement = pa().credentials.find(
+      (c) => c.credentialType === "SUPERVISION_AGREEMENT",
+    );
+    expect(agreement?.required).toBe(true);
+    expect(agreement?.requiresDocument).toBe(true);
+    expect(agreement?.requiresExpiration).toBe(true);
+  });
+
+  it("does not force every PA through manual review", () => {
+    // Supervision is normal for a PA and evidenced by the document above. Only
+    // the athletic trainer's setting restriction warrants a human every time.
+    expect(pa().manualReviewRequired).toBe(false);
+  });
+});
+
+describe("aggregating a legal obligation across professions", () => {
+  it("does not let a laxer profession downgrade a shared credential", () => {
+    // A CPR card is DexaFit policy for a personal trainer and Massachusetts law
+    // for an athletic trainer. Someone who is both holds one card under the
+    // stricter reason, and the order the professions are read must not matter.
+    for (const order of [
+      ["PERSONAL_TRAINER", "ATHLETIC_TRAINER"],
+      ["ATHLETIC_TRAINER", "PERSONAL_TRAINER"],
+    ] as const) {
+      const cpr = getRequirements(order, MA).credentials.filter(
+        (c) => c.credentialType === "CPR_AED",
+      );
+      expect(cpr, `${order.join("+")} should ask for one CPR card`).toHaveLength(1);
+      expect(cpr[0].legalRequirement, `${order.join("+")} understates the CPR rule`).toBe(
+        true,
+      );
+      expect(cpr[0].marketplaceRequirement).toBe(true);
+    }
+  });
+
+  it("keeps two supervision agreements apart when both professions need one", () => {
+    // A PA's signed guidelines are not an athletic trainer's directing-clinician
+    // agreement, so one document must not satisfy the other.
+    const both = getRequirements(["ATHLETIC_TRAINER", "PHYSICIAN_ASSISTANT"], MA);
+    const agreements = both.credentials.filter(
+      (c) => c.credentialType === "SUPERVISION_AGREEMENT",
+    );
+    expect(agreements).toHaveLength(2);
+    expect(new Set(agreements.map((a) => a.key)).size).toBe(2);
+  });
+});

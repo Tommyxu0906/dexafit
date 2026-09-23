@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:db": "scripts/psql.sh -f supabase/tests/security.sql",
     "seed:demo": "scripts/psql.sh -v allow_demo_seed=yes -f supabase/seed/demo.sql",
+    "seed:demo:clear": "scripts/psql.sh -v allow_demo_clear=yes -f supabase/seed/clear-demo.sql",
     "audit:documents": "scripts/psql.sh -f supabase/tools/orphaned-documents.sql"
   },
   "dependencies": {

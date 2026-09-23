@@ -70,8 +70,12 @@ export type ApplicationRow = {
 export type CredentialRow = {
   id: string;
   professional_id: string;
-  /** Which requirement this credential satisfies; see `requirementKey`. */
-  requirement_key: string | null;
+  /**
+   * Which requirement this credential satisfies; see `requirementKey`.
+   * NOT NULL in the database since migration 0012 — readiness matches on this
+   * and never on credential_type, so a missing value has no safe meaning.
+   */
+  requirement_key: string;
   credential_type: CredentialType;
   credential_name: string;
   credential_number: string | null;
