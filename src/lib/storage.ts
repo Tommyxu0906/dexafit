@@ -64,7 +64,48 @@ export function buildStorageKey(
   return `${professionalId}/${documentType}/${crypto.randomUUID()}.${extension}`;
 }
 
+/** Licences, certificates, insurance. Never public. */
 export const DOCUMENT_BUCKET = "professional-documents";
 
-/** Signed URLs are deliberately short-lived; documents are never public. */
+/**
+ * Profile photos, and nothing else.
+ *
+ * Separate because the marketplace displays photos, and the obvious way to
+ * serve them is a public bucket. Photos used to live beside every credential
+ * document, so making that bucket public would have published every licence at
+ * a permanent unauthenticated URL — silently, with no error.
+ *
+ * The routing below is a convenience. The actual guarantee is the storage
+ * INSERT policy, which refuses anything but a PROFILE_PHOTO key in this bucket,
+ * so a bug here fails the upload instead of publishing a licence.
+ */
+export const PHOTO_BUCKET = "professional-photos";
+
+/** The one document type that is public. */
+export const PUBLIC_DOCUMENT_TYPE = "PROFILE_PHOTO";
+
+export function bucketForDocumentType(documentType: string): string {
+  return documentType === PUBLIC_DOCUMENT_TYPE ? PHOTO_BUCKET : DOCUMENT_BUCKET;
+}
+
+export function isPubliclyServed(documentType: string): boolean {
+  return documentType === PUBLIC_DOCUMENT_TYPE;
+}
+
+/**
+ * A profile photo is displayed on a public page, so a PDF has no use here and a
+ * public bucket that accepts documents is a leak waiting to happen.
+ */
+const PHOTO_MIME_TYPES: readonly string[] = ["image/jpeg", "image/png", "image/webp"];
+
+export function isAllowedForDocumentType(
+  documentType: string,
+  mimeType: string,
+): boolean {
+  return documentType === PUBLIC_DOCUMENT_TYPE
+    ? PHOTO_MIME_TYPES.includes(mimeType)
+    : (ALLOWED_UPLOAD_MIME_TYPES as readonly string[]).includes(mimeType);
+}
+
+/** Signed URLs are deliberately short-lived; private documents are never public. */
 export const SIGNED_URL_TTL_SECONDS = 60;

@@ -130,6 +130,9 @@ export type DocumentRow = {
   id: string;
   professional_id: string;
   document_type: DocumentType;
+  /** Which bucket holds the bytes. professional-photos is public, and may only
+   *  ever hold a PROFILE_PHOTO; everything else is private. */
+  bucket: string;
   storage_key: string;
   original_filename: string;
   mime_type: string;
