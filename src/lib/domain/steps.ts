@@ -1,13 +1,25 @@
+/**
+ * Onboarding asks what credentialing needs and nothing else.
+ *
+ * Two steps were removed rather than reordered:
+ *
+ *   Products & pricing  is not a credentialing question. A provider fills it in
+ *                       on their own profile once they are approved, where they
+ *                       can change prices without re-entering the wizard.
+ *
+ *   Where you practice  duplicated the Practice step, which already asks for a
+ *                       business address. That address is now stored for every
+ *                       provider rather than only for organisations, so nothing
+ *                       is lost by dropping the second question.
+ */
 export const ONBOARDING_STEPS = [
   { slug: "about", title: "About you", index: 1 },
   { slug: "practice", title: "Practice", index: 2 },
   { slug: "credentials", title: "Credentials", index: 3 },
   { slug: "insurance", title: "Insurance & compliance", index: 4 },
   { slug: "who-you-help", title: "Who you help", index: 5 },
-  { slug: "services", title: "Services & pricing", index: 6 },
-  { slug: "locations", title: "Where you practice", index: 7 },
-  { slug: "attestations", title: "Privacy & attestations", index: 8 },
-  { slug: "review", title: "Review & submit", index: 9 },
+  { slug: "attestations", title: "Privacy & attestations", index: 6 },
+  { slug: "review", title: "Review & submit", index: 7 },
 ] as const;
 
 export type StepSlug = (typeof ONBOARDING_STEPS)[number]["slug"];

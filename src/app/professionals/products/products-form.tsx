@@ -14,16 +14,20 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
-import {
-  completeServicesStep,
-  deleteService,
-  saveService,
-} from "@/lib/actions/onboarding";
+import { deleteService, saveService } from "@/lib/actions/onboarding";
 import { idleState } from "@/lib/actions/state";
 import type { ServiceOfferingRow } from "@/lib/data/types";
-import { SERVICE_MODES, SERVICE_MODE_LABELS } from "@/lib/domain/enums";
+import {
+  PRODUCT_TYPES,
+  PRODUCT_TYPE_DESCRIPTIONS,
+  PRODUCT_TYPE_LABELS,
+  SERVICE_MODES,
+  SERVICE_MODE_LABELS,
+  productNeedsDuration,
+  type ProductType,
+} from "@/lib/domain/enums";
 
-const SERVICE_CATEGORIES = [
+const PRODUCT_CATEGORIES = [
   "Consultation",
   "Training program",
   "Nutrition",
@@ -34,46 +38,46 @@ const SERVICE_CATEGORIES = [
   "Other",
 ];
 
-export function ServicesStep({ services }: { services: ServiceOfferingRow[] }) {
+export function ProductsForm({ services }: { services: ServiceOfferingRow[] }) {
   const [adding, setAdding] = useState(services.length === 0);
   const [editing, setEditing] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
       <SectionHeading
-        title="Services & pricing"
-        description="What a DexaFit customer can book with you. Add at least one service."
+        title="Products & pricing"
+        description="What a DexaFit customer can buy or book with you. Add these whenever you like — they are not part of your application, and you can change them at any time."
       />
 
-      <Callout tone="info" title="Booking stays with you for now">
-        DexaFit does not yet handle scheduling or payment. Link your own booking page, or
-        leave it blank and customers will send you a contact request.
+      <Callout tone="info" title="Booking and payment stay with you for now">
+        DexaFit does not yet handle scheduling or payment. Link your own booking or
+        checkout page, or leave it blank and customers will send you a contact request.
       </Callout>
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-semibold text-ink">Your services</p>
+          <p className="text-sm font-semibold text-ink">Your products</p>
           {!adding ? (
             <Button type="button" variant="secondary" onClick={() => setAdding(true)}>
-              Add service
+              Add product
             </Button>
           ) : null}
         </div>
 
         <div className="mt-4 flex flex-col gap-3">
           {services.length === 0 && !adding ? (
-            <EmptyState>No services yet.</EmptyState>
+            <EmptyState>No products yet.</EmptyState>
           ) : null}
 
           {services.map((service) =>
             editing === service.id ? (
-              <ServiceForm
+              <ProductForm
                 key={service.id}
                 service={service}
                 onDone={() => setEditing(null)}
               />
             ) : (
-              <ServiceSummary
+              <ProductSummary
                 key={service.id}
                 service={service}
                 onEdit={() => setEditing(service.id)}
@@ -81,20 +85,14 @@ export function ServicesStep({ services }: { services: ServiceOfferingRow[] }) {
             ),
           )}
 
-          {adding ? <ServiceForm service={null} onDone={() => setAdding(false)} /> : null}
+          {adding ? <ProductForm service={null} onDone={() => setAdding(false)} /> : null}
         </div>
       </Card>
-
-      <form action={completeServicesStep} className="flex justify-end">
-        <Button type="submit" disabled={services.length === 0}>
-          Save and continue
-        </Button>
-      </form>
     </div>
   );
 }
 
-function ServiceSummary({
+function ProductSummary({
   service,
   onEdit,
 }: {
@@ -110,7 +108,8 @@ function ServiceSummary({
         <p className="mt-1 line-clamp-2 text-xs text-muted">{service.service_description}</p>
         <div className="mt-2 flex flex-wrap gap-2">
           <Badge tone="info">{SERVICE_MODE_LABELS[service.modality]}</Badge>
-          <Badge>{service.duration_minutes} min</Badge>
+          <Badge tone="neutral">{PRODUCT_TYPE_LABELS[service.product_type as ProductType]}</Badge>
+          {service.duration_minutes ? <Badge>{service.duration_minutes} min</Badge> : null}
           {service.price_amount != null ? (
             <Badge>${Number(service.price_amount).toLocaleString()}</Badge>
           ) : null}
@@ -134,7 +133,7 @@ function ServiceSummary({
   );
 }
 
-function ServiceForm({
+function ProductForm({
   service,
   onDone,
 }: {
@@ -145,6 +144,12 @@ function ServiceForm({
   const [acceptsInsurance, setAcceptsInsurance] = useState(
     service?.accepts_insurance ?? false,
   );
+  // Chosen first, because it decides which of the fields below apply: something
+  // bought outright has no appointment length and no delivery mode.
+  const [productType, setProductType] = useState<ProductType>(
+    (service?.product_type as ProductType) ?? "IN_PERSON_SERVICE",
+  );
+  const needsDuration = productNeedsDuration(productType);
   const errors = state.fieldErrors ?? {};
   const key = service?.id ?? "new";
 
@@ -156,8 +161,44 @@ function ServiceForm({
     <form action={formAction} className="rounded-xl border border-accent/40 bg-white p-4">
       {service ? <input type="hidden" name="id" value={service.id} /> : null}
 
+      <fieldset className="mb-4">
+        <legend className="mb-1 text-sm font-semibold text-ink">
+          What kind of product is this?
+        </legend>
+        <p className="mb-3 text-xs text-muted">
+          This decides what else we ask for.
+        </p>
+        <div className="grid gap-2 sm:grid-cols-3">
+          {PRODUCT_TYPES.map((type) => (
+            <label
+              key={type}
+              className={`cursor-pointer rounded-xl border p-3 text-left transition ${
+                productType === type
+                  ? "border-accent bg-accent/5"
+                  : "border-line hover:border-accent/40"
+              }`}
+            >
+              <input
+                type="radio"
+                name="productType"
+                value={type}
+                checked={productType === type}
+                onChange={() => setProductType(type)}
+                className="sr-only"
+              />
+              <span className="block text-sm font-semibold text-ink">
+                {PRODUCT_TYPE_LABELS[type]}
+              </span>
+              <span className="mt-1 block text-xs text-muted">
+                {PRODUCT_TYPE_DESCRIPTIONS[type]}
+              </span>
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Service name" htmlFor={`name-${key}`} required error={errors.serviceName}>
+        <Field label="Product name" htmlFor={`name-${key}`} required error={errors.serviceName}>
           <Input
             id={`name-${key}`}
             name="serviceName"
@@ -170,9 +211,9 @@ function ServiceForm({
           <Select
             id={`category-${key}`}
             name="serviceCategory"
-            defaultValue={service?.service_category ?? SERVICE_CATEGORIES[0]}
+            defaultValue={service?.service_category ?? PRODUCT_CATEGORIES[0]}
           >
-            {SERVICE_CATEGORIES.map((category) => (
+            {PRODUCT_CATEGORIES.map((category) => (
               <option key={category} value={category}>
                 {category}
               </option>
@@ -212,21 +253,23 @@ function ServiceForm({
             ))}
           </Select>
         </Field>
-        <Field
-          label="Duration (minutes)"
-          htmlFor={`duration-${key}`}
-          required
-          error={errors.durationMinutes}
-        >
-          <Input
-            id={`duration-${key}`}
-            name="durationMinutes"
-            type="number"
-            min={1}
-            defaultValue={service?.duration_minutes ?? 60}
+        {needsDuration ? (
+          <Field
+            label="Duration (minutes)"
+            htmlFor={`duration-${key}`}
             required
-          />
-        </Field>
+            error={errors.durationMinutes}
+          >
+            <Input
+              id={`duration-${key}`}
+              name="durationMinutes"
+              type="number"
+              min={1}
+              defaultValue={service?.duration_minutes ?? 60}
+              required
+            />
+          </Field>
+        ) : null}
         <Field label="Price (USD, optional)" htmlFor={`price-${key}`}>
           <Input
             id={`price-${key}`}

@@ -146,6 +146,8 @@ export type ServiceOfferingRow = {
   service_name: string;
   service_description: string;
   service_category: string;
+  /** What kind of thing this is; decides whether duration applies. */
+  product_type: string;
   modality: ServiceMode;
   duration_minutes: number;
   price_amount: number | null;

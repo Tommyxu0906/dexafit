@@ -125,6 +125,7 @@ describe("business address", () => {
       serviceName: "Initial consult",
       serviceDescription: "A first session.",
       serviceCategory: "Consultation",
+      productType: "IN_PERSON_SERVICE",
       modality: "VIRTUAL",
       durationMinutes: 45,
       priceAmount: undefined,
@@ -226,6 +227,50 @@ describe("insurance is required, its certificate is not", () => {
     expect(
       insuranceSchema.safeParse({ ...policy, certificateDocumentId: "not-a-uuid" })
         .success,
+    ).toBe(false);
+  });
+});
+
+describe("a product is not always an appointment", () => {
+  // Products left onboarding and became their own thing. A provider may sell a
+  // session, an item bought outright, or a service delivered some other way,
+  // and only the first two kinds have a length.
+  const product = (overrides: Record<string, unknown> = {}) => ({
+    serviceName: "Body composition consult",
+    serviceDescription: "A first session.",
+    serviceCategory: "Consultation",
+    productType: "IN_PERSON_SERVICE",
+    modality: "IN_PERSON",
+    durationMinutes: 45,
+    freeIntroConsult: false,
+    bookingUrl: null,
+    acceptsSelfPay: true,
+    acceptsInsurance: false,
+    insuranceNotes: null,
+    ...overrides,
+  });
+
+  it("requires a duration for a booked session", () => {
+    const result = serviceOfferingSchema.safeParse(
+      product({ productType: "IN_PERSON_SERVICE", durationMinutes: undefined }),
+    );
+    expect(result.success).toBe(false);
+  });
+
+  it("does not require one for something bought outright", () => {
+    // Demanding a number here would put "60 min" on the listing for a T-shirt.
+    const result = serviceOfferingSchema.safeParse(
+      product({ productType: "ECOMMERCE", durationMinutes: undefined }),
+    );
+    expect(result.success).toBe(true);
+  });
+
+  it("still requires a product type", () => {
+    expect(
+      serviceOfferingSchema.safeParse(product({ productType: undefined })).success,
+    ).toBe(false);
+    expect(
+      serviceOfferingSchema.safeParse(product({ productType: "NONSENSE" })).success,
     ).toBe(false);
   });
 });

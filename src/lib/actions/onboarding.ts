@@ -7,7 +7,7 @@ import { after } from "next/server";
 import { AGREEMENT_VERSION, ATTESTATION_TYPES } from "../domain/attestations";
 import { filterAllowedCapabilities } from "../domain/capabilities";
 import { DISCLOSURE_TYPES, PROFESSION_LABELS } from "../domain/enums";
-import { getRequirements, requirementKey } from "../domain/requirements";
+import { getRequirements } from "../domain/requirements";
 import {
   aboutYouSchema,
   attestationsSchema,
@@ -17,7 +17,6 @@ import {
   disclosuresSchema,
   insuranceSchema,
   practiceSchema,
-  serviceLocationSchema,
   serviceOfferingSchema,
 } from "../domain/schemas";
 import { getApplicationBundle, primaryJurisdiction } from "../data/professional";
@@ -209,6 +208,48 @@ export async function savePractice(
     .eq("id", professionalId);
 
   if (error) return failure(error.message);
+
+  // Store the practice address as the provider's primary location.
+  //
+  // This step has always asked for an address, but only persisted it by
+  // creating an organisation row — so for an individual practitioner it was
+  // collected and silently dropped. Every provider on file is an individual,
+  // which meant the address only survived if they also filled in the separate
+  // "Where you practice" step. That step is gone, so this is now the only path.
+  //
+  // It also keeps the credentialing engine working: primaryJurisdiction() reads
+  // locations first, and the state it returns decides which rules apply.
+  const primaryMode = value.serviceModes[0] ?? "IN_PERSON";
+  const locationPayload = {
+    professional_id: professionalId,
+    country: value.country,
+    state: value.state ?? null,
+    city: value.city ?? null,
+    postal_code: value.postalCode ?? null,
+    address_1: value.businessAddress1 ?? null,
+    address_2: value.businessAddress2 ?? null,
+    service_mode: primaryMode,
+  };
+
+  const { data: existingLocation } = await supabase
+    .from("service_locations")
+    .select("id")
+    .eq("professional_id", professionalId)
+    .order("created_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  // Update the existing row rather than adding another, or editing the practice
+  // address would leave the old one behind and primaryJurisdiction() would keep
+  // reading it.
+  const { error: locationError } = existingLocation
+    ? await supabase
+        .from("service_locations")
+        .update(locationPayload)
+        .eq("id", existingLocation.id)
+    : await supabase.from("service_locations").insert(locationPayload);
+
+  if (locationError) return failure(locationError.message);
 
   await markStepComplete(application, "practice");
   revalidateOnboarding();
@@ -585,7 +626,7 @@ export async function saveCapabilities(
 }
 
 // ---------------------------------------------------------------------------
-// Step 6 — Services
+// Products (not an onboarding step)
 // ---------------------------------------------------------------------------
 
 export async function saveService(
@@ -599,8 +640,9 @@ export async function saveService(
     serviceName: formData.get("serviceName"),
     serviceDescription: formData.get("serviceDescription"),
     serviceCategory: formData.get("serviceCategory"),
+    productType: formData.get("productType"),
     modality: formData.get("modality"),
-    durationMinutes: formData.get("durationMinutes"),
+    durationMinutes: formString(formData.get("durationMinutes")),
     priceAmount: formString(formData.get("priceAmount")),
     freeIntroConsult: formBoolean(formData.get("freeIntroConsult")),
     bookingUrl: formData.get("bookingUrl"),
@@ -621,8 +663,11 @@ export async function saveService(
     service_name: value.serviceName,
     service_description: value.serviceDescription,
     service_category: value.serviceCategory,
+    product_type: value.productType,
     modality: value.modality,
-    duration_minutes: value.durationMinutes,
+    // Null rather than a placeholder number: an item bought outright has no
+    // duration, and storing 60 would put "60 min" on a listing for a T-shirt.
+    duration_minutes: value.durationMinutes ?? null,
     price_amount: value.priceAmount ?? null,
     free_intro_consult: value.freeIntroConsult,
     booking_url: value.bookingUrl ?? null,
@@ -642,7 +687,7 @@ export async function saveService(
   if (error) return failure(error.message);
 
   revalidateOnboarding();
-  return success("Service saved.");
+  return success("Product saved.");
 }
 
 export async function deleteService(
@@ -665,150 +710,17 @@ export async function deleteService(
   return success("Service removed.");
 }
 
-export async function completeServicesStep(): Promise<void> {
-  const { professionalId, application } = await getOnboardingContext();
-  const bundle = await getApplicationBundle(professionalId);
-  if ((bundle?.services.length ?? 0) === 0) return;
-
-  await markStepComplete(application, "services");
-  revalidateOnboarding();
-  redirect(`${ONBOARDING_BASE}/locations`);
-}
-
 // ---------------------------------------------------------------------------
-// Step 7 — Where you practice
+// Products and practice locations are no longer wizard steps.
+//
+// saveService and deleteService above still serve the standalone products
+// page. The step-completion actions and the whole location CRUD went with
+// the steps: the practice address is written by savePracticeStep, which is
+// where it is asked for.
 // ---------------------------------------------------------------------------
 
-export async function saveLocation(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const { professionalId, profile } = await getOnboardingContext();
-
-  const parsed = serviceLocationSchema.safeParse({
-    id: formString(formData.get("id")),
-    country: formData.get("country"),
-    state: formData.get("state"),
-    city: formData.get("city"),
-    postalCode: formData.get("postalCode"),
-    address1: formData.get("address1"),
-    address2: formData.get("address2"),
-    serviceMode: formData.get("serviceMode"),
-  });
-
-  if (!parsed.success) {
-    return failure("Please fix the highlighted fields.", toFieldErrors(parsed.error));
-  }
-
-  const value = parsed.data;
-  const supabase = await createClient();
-
-  const payload = {
-    professional_id: professionalId,
-    country: value.country,
-    state: value.state,
-    city: value.city ?? null,
-    postal_code: value.postalCode ?? null,
-    address_1: value.address1 ?? null,
-    address_2: value.address2 ?? null,
-    service_mode: value.serviceMode,
-  };
-
-  const { error } = value.id
-    ? await supabase
-        .from("service_locations")
-        .update(payload)
-        .eq("id", value.id)
-        .eq("professional_id", professionalId)
-    : await supabase.from("service_locations").insert(payload);
-
-  if (error) return failure(error.message);
-
-  // Mirror the location into a service jurisdiction, linked to a license held in
-  // that state when one exists. This is the hook nationwide expansion builds on.
-  if (profile.profession_types.length > 0) {
-    const { data: credentials, error: credentialsError } = await supabase
-      .from("credentials")
-      .select("id, requirement_key, credential_type, jurisdiction_state")
-      .eq("professional_id", professionalId);
-
-    // A failed read here would silently mirror the location with no licence
-    // attached, which reads downstream as "this provider holds no licence in
-    // the state they practise in".
-    if (credentialsError) {
-      captureServerError(credentialsError, {
-        operation: "onboarding.saveServiceLocation.linkJurisdiction",
-        professionalId,
-        detail: "credentials lookup",
-      });
-    }
-
-    // One row per profession per state: a physical therapist who is also a
-    // dietitian is authorised in Massachusetts by two different licences, and
-    // each row has to point at its own.
-    const rows = profile.profession_types.map((professionType) => {
-      const licenceKey = requirementKey(professionType, "STATE_LICENSE");
-      const licence = credentials?.find(
-        (c) => c.requirement_key === licenceKey && c.jurisdiction_state === value.state,
-      );
-      return {
-        professional_id: professionalId,
-        country: value.country,
-        state: value.state,
-        profession_type: professionType,
-        credential_id: licence?.id ?? null,
-        virtual_allowed: value.serviceMode !== "IN_PERSON",
-        in_person_allowed: value.serviceMode !== "VIRTUAL",
-      };
-    });
-
-    const { error: jurisdictionError } = await supabase
-      .from("professional_service_jurisdictions")
-      .upsert(rows, { onConflict: "professional_id,country,state,profession_type" });
-
-    if (jurisdictionError) {
-      return failure(
-        `Could not record where you are licensed to serve: ${jurisdictionError.message}`,
-      );
-    }
-  }
-
-  revalidateOnboarding();
-  return success("Location saved.");
-}
-
-export async function deleteLocation(
-  _prev: ActionState,
-  formData: FormData,
-): Promise<ActionState> {
-  const { professionalId } = await getOnboardingContext();
-  const id = formString(formData.get("id"));
-  if (!id) return failure("Missing location.");
-
-  const supabase = await createClient();
-  const { error } = await supabase
-    .from("service_locations")
-    .delete()
-    .eq("id", id)
-    .eq("professional_id", professionalId);
-
-  if (error) return failure(error.message);
-  revalidateOnboarding();
-  return success("Location removed.");
-}
-
-export async function completeLocationsStep(): Promise<void> {
-  const { professionalId, application } = await getOnboardingContext();
-  const bundle = await getApplicationBundle(professionalId);
-  if ((bundle?.locations.length ?? 0) === 0) return;
-
-  await markStepComplete(application, "locations");
-  revalidateOnboarding();
-  redirect(`${ONBOARDING_BASE}/attestations`);
-}
-
 // ---------------------------------------------------------------------------
-// Step 8 — Attestations
+// Step 6 — Attestations
 // ---------------------------------------------------------------------------
 
 export async function saveAttestations(
@@ -873,7 +785,7 @@ export async function saveAttestations(
 }
 
 // ---------------------------------------------------------------------------
-// Step 9 — Submit
+// Step 7 — Submit
 // ---------------------------------------------------------------------------
 
 export async function submitApplication(
@@ -931,12 +843,10 @@ export async function submitApplication(
   if (bundle.capabilities.length === 0) {
     problems.push("Select who you help.");
   }
-  if (bundle.services.length === 0) {
-    problems.push("Add at least one service.");
-  }
-  if (bundle.locations.length === 0) {
-    problems.push("Add at least one practice location.");
-  }
+  // Products are no longer part of onboarding — a provider adds them on their
+  // profile after approval — so an empty list is not a reason to block
+  // submission. The practice address is checked at the Practice step instead,
+  // where it is asked for.
   if (bundle.disclosures.length !== DISCLOSURE_TYPES.length) {
     problems.push("Answer all compliance questions.");
   }

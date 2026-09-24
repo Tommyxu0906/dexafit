@@ -99,6 +99,36 @@ export const SERVICE_MODE_LABELS: Record<ServiceMode, string> = {
   HYBRID: "Hybrid",
 };
 
+/**
+ * What kind of thing a provider is selling. Chosen first on the products form,
+ * because it decides which of the remaining fields apply — an item bought
+ * online has no appointment length.
+ */
+export const PRODUCT_TYPES = [
+  "IN_PERSON_SERVICE",
+  "ECOMMERCE",
+  "PROFESSIONAL_SERVICE",
+] as const;
+
+export type ProductType = (typeof PRODUCT_TYPES)[number];
+
+export const PRODUCT_TYPE_LABELS: Record<ProductType, string> = {
+  IN_PERSON_SERVICE: "In-person service",
+  ECOMMERCE: "Product for sale",
+  PROFESSIONAL_SERVICE: "Professional service",
+};
+
+export const PRODUCT_TYPE_DESCRIPTIONS: Record<ProductType, string> = {
+  IN_PERSON_SERVICE: "A session you deliver face to face, booked for a length of time.",
+  ECOMMERCE: "Something a client buys outright — a plan, a programme, a physical item.",
+  PROFESSIONAL_SERVICE: "Anything else you offer, remote or otherwise.",
+};
+
+/** Only a booked session has a length. */
+export function productNeedsDuration(productType: string): boolean {
+  return productType === "IN_PERSON_SERVICE" || productType === "PROFESSIONAL_SERVICE";
+}
+
 export const JOINING_AS = [
   "INDIVIDUAL",
   "ORGANIZATION_MEMBER",

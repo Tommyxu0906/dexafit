@@ -7,6 +7,8 @@ import {
   JOINING_AS,
   PROFESSION_TYPES,
   SERVICE_MODES,
+  PRODUCT_TYPES,
+  productNeedsDuration,
 } from "./enums";
 
 /**
@@ -194,8 +196,12 @@ export const serviceOfferingSchema = z
     serviceName: z.string().trim().min(1, "Required").max(150),
     serviceDescription: z.string().trim().min(1, "Required").max(1000),
     serviceCategory: z.string().trim().min(1, "Required").max(100),
+    productType: z.enum(PRODUCT_TYPES),
     modality: z.enum(SERVICE_MODES),
-    durationMinutes: z.coerce.number().int().positive("Must be greater than 0"),
+    // Optional here and required below only for the kinds that have one. A
+    // product bought outright has no appointment length, and demanding a
+    // number would put a meaningless 60 on every one of them.
+    durationMinutes: z.coerce.number().int().positive("Must be greater than 0").optional(),
     priceAmount: z.coerce.number().nonnegative().optional(),
     freeIntroConsult: z.boolean(),
     bookingUrl: optionalUrl,
@@ -211,22 +217,17 @@ export const serviceOfferingSchema = z
         message: "Tell clients which plans you accept",
       });
     }
+    if (productNeedsDuration(value.productType) && !value.durationMinutes) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["durationMinutes"],
+        message: "How long does this take?",
+      });
+    }
   });
 
 export type ServiceOfferingInput = z.infer<typeof serviceOfferingSchema>;
 
-export const serviceLocationSchema = z.object({
-  id: z.string().uuid().optional(),
-  country: z.string().trim().min(2).max(2),
-  state: z.string().trim().min(2, "Required").max(2),
-  city: optionalText,
-  postalCode: optionalText,
-  address1: optionalText,
-  address2: optionalText,
-  serviceMode: z.enum(SERVICE_MODES),
-});
-
-export type ServiceLocationInput = z.infer<typeof serviceLocationSchema>;
 
 export const jurisdictionSchema = z.object({
   country: z.string().trim().min(2).max(2),
