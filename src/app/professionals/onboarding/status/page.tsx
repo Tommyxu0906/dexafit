@@ -96,6 +96,23 @@ export default async function StatusPage() {
         </Card>
       ) : null}
 
+      {/* Products left the wizard, so this is the only way to reach them until
+          the provider profile page exists. Without a link the page is written
+          but unreachable, which is the same as not having built it. */}
+      <Card>
+        <h2 className="text-sm font-bold text-ink">Products &amp; pricing</h2>
+        <p className="mt-2 text-sm text-muted">
+          What a DexaFit customer can buy or book with you. This is not part of your
+          application — add or change it whenever you like.
+        </p>
+        <Link
+          href="/professionals/products"
+          className="mt-3 inline-block text-sm font-semibold text-emerald-700 underline underline-offset-2"
+        >
+          Manage my products
+        </Link>
+      </Card>
+
       <Card>
         <h2 className="text-sm font-bold text-ink">History</h2>
         {eventsError ? (

@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { ONBOARDING_STEPS, STEP_SLUGS, nextStep } from "../steps";
+import { ATTESTATION_TEXT, ATTESTATION_TYPES } from "../attestations";
 import {
   CLIENT_POPULATIONS,
   ASSESSMENT_FINDINGS,
@@ -139,4 +141,66 @@ describe("holding several qualifications stays walkable", () => {
       }
     },
   );
+});
+
+describe("the wizard only asks credentialing questions", () => {
+  // Products and a second address left the wizard. The chain has to stay
+  // connected, or a provider walks into a step that no longer exists.
+  it("runs from about to review with no dangling step", () => {
+    expect(STEP_SLUGS[0]).toBe("about");
+    expect(STEP_SLUGS[STEP_SLUGS.length - 1]).toBe("review");
+
+    for (let i = 0; i < STEP_SLUGS.length - 1; i += 1) {
+      expect(nextStep(STEP_SLUGS[i]), `${STEP_SLUGS[i]} leads nowhere`).toBe(
+        STEP_SLUGS[i + 1],
+      );
+    }
+    expect(nextStep("review")).toBeNull();
+  });
+
+  it("no longer asks for products or a second address", () => {
+    // Either one reappearing means onboarding grew a question that does not
+    // decide whether someone can be credentialed.
+    expect(STEP_SLUGS).not.toContain("services");
+    expect(STEP_SLUGS).not.toContain("locations");
+  });
+
+  it("numbers the steps consecutively from one", () => {
+    // The index is what the sidebar renders; a gap shows up as "step 7 of 7"
+    // sitting under step 5.
+    ONBOARDING_STEPS.forEach((step, i) => {
+      expect(step.index, `${step.slug} is numbered ${step.index}`).toBe(i + 1);
+    });
+  });
+});
+
+describe("the attestations a provider signs", () => {
+  it("records that they practise independently of DexaFit", () => {
+    // The point is liability separation, so the wording has to actually say
+    // they are not an employee and are responsible for their own services.
+    const text = ATTESTATION_TEXT.INDEPENDENT_PRACTICE.toLowerCase();
+    expect(text).toContain("not an employee");
+    expect(text).toContain("solely responsible");
+  });
+
+  it("gets consent before DexaFit edits anyone's copy", () => {
+    const text = ATTESTATION_TEXT.PROFILE_CONTENT_EDITING.toLowerCase();
+    expect(text).toContain("edit");
+    // Editing for tone is not licence to change what they claim to offer.
+    expect(text).toContain("without changing the substance");
+  });
+
+  it("still flags every clause that legal has not settled", () => {
+    // Inventing final legal wording is not ours to do. These two carry real
+    // exposure, so they stay marked until a lawyer signs them off.
+    for (const type of ["INDEPENDENT_PRACTICE", "MARKETPLACE_TERMS"] as const) {
+      expect(ATTESTATION_TEXT[type], type).toContain("PLACEHOLDER");
+    }
+  });
+
+  it("asks for every attestation on the list", () => {
+    for (const type of ATTESTATION_TYPES) {
+      expect(ATTESTATION_TEXT[type], `${type} has no text`).toBeTruthy();
+    }
+  });
 });

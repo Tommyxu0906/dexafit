@@ -71,6 +71,24 @@ export default async function ReviewStep() {
         <Row label="Practice name" value={profile.practice_name} />
         <Row label="Business email" value={profile.business_email} />
         <Row label="Business phone" value={profile.business_phone} />
+        {/* The practice address is the only address now that the separate
+            location step is gone, so the applicant should see it here before
+            submitting rather than discover it was never captured. */}
+        <Row
+          label="Practice address"
+          value={
+            bundle.locations[0]
+              ? [
+                  bundle.locations[0].address_1,
+                  bundle.locations[0].city,
+                  bundle.locations[0].state,
+                  bundle.locations[0].postal_code,
+                ]
+                  .filter(Boolean)
+                  .join(", ")
+              : null
+          }
+        />
         <Row
           label="Service modes"
           value={profile.service_modes?.map((m) => SERVICE_MODE_LABELS[m]).join(", ")}
@@ -153,27 +171,10 @@ export default async function ReviewStep() {
         </div>
       </ReviewSection>
 
-      <ReviewSection title="Services" editHref="/professionals/onboarding/services">
-        {bundle.services.map((service) => (
-          <Row
-            key={service.id}
-            label={service.service_name}
-            value={`${SERVICE_MODE_LABELS[service.modality]} · ${service.duration_minutes} min${
-              service.price_amount != null ? ` · $${service.price_amount}` : ""
-            }`}
-          />
-        ))}
-      </ReviewSection>
-
-      <ReviewSection title="Where you practice" editHref="/professionals/onboarding/locations">
-        {bundle.locations.map((location) => (
-          <Row
-            key={location.id}
-            label={[location.city, location.state].filter(Boolean).join(", ")}
-            value={SERVICE_MODE_LABELS[location.service_mode]}
-          />
-        ))}
-      </ReviewSection>
+      {/* Products are not reviewed here. They are not a credentialing question,
+          they are added on the provider's own page after approval, and listing
+          them in the application implied they had to be filled in first.
+          Practice location is shown under Practice, where it is now asked. */}
 
       <ReviewSection title="Attestations" editHref="/professionals/onboarding/attestations">
         <Row
