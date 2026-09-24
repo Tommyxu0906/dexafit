@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  ASSESSMENT_FINDINGS,
+  CAPABILITY_LABELS,
+  CLIENT_POPULATIONS,
+  FINDING_GROUP,
   allowedCapabilities,
   filterAllowedCapabilities,
   isCapabilityAllowed,
@@ -7,16 +11,28 @@ import {
 import { PROFESSION_TYPES } from "../enums";
 
 describe("capability scope enforcement", () => {
-  it("lets a personal trainer claim training-related DEXA capabilities", () => {
+  it("lets a personal trainer claim training-related findings", () => {
     for (const code of [
       "LOW_LEAN_MASS",
-      "DEXA_BODY_RECOMPOSITION",
-      "DEXA_MUSCLE_GAIN",
-      "FAT_LOSS",
-      "SPORTS_PERFORMANCE",
+      "HIGH_BODY_FAT",
+      "LEAN_MASS_ASYMMETRY",
+      // DexaFit measures more than body composition, and reading a VO2 max
+      // result to set training zones is squarely a trainer's job.
+      "LOW_VO2_MAX",
+      "HEART_RATE_ZONES",
+      "RMR_CALORIE_TARGETS",
     ]) {
-      expect(isCapabilityAllowed(["PERSONAL_TRAINER"], code)).toBe(true);
+      expect(isCapabilityAllowed(["PERSONAL_TRAINER"], code), code).toBe(true);
     }
+  });
+
+  it("keeps a trainer out of interpreting why a metabolic rate is low", () => {
+    // Setting calorie targets from a measured RMR is coaching. Deciding that
+    // the number is low for a clinical reason is not.
+    expect(isCapabilityAllowed(["PERSONAL_TRAINER"], "LOW_RMR")).toBe(false);
+    expect(isCapabilityAllowed(["PERSONAL_TRAINER"], "MEDICAL_NUTRITION_THERAPY")).toBe(
+      false,
+    );
   });
 
   it("never offers clinical scopes to a personal trainer", () => {
@@ -57,9 +73,9 @@ describe("capability scope enforcement", () => {
       "MUSCLE_GAIN",
       "PSYCHOTHERAPY",
       "MEDICAL_DIAGNOSIS",
-      "FAT_LOSS",
+      "HIGH_BODY_FAT",
     ]);
-    expect(filtered).toEqual(["MUSCLE_GAIN", "FAT_LOSS"]);
+    expect(filtered).toEqual(["MUSCLE_GAIN", "HIGH_BODY_FAT"]);
   });
 
   it("defines an allow-list for every profession", () => {
@@ -89,5 +105,67 @@ describe("capability scope enforcement", () => {
         "MEDICAL_DIAGNOSIS",
       ),
     ).toBe(false);
+  });
+});
+
+describe("the two axes stay separate", () => {
+  // The bug this prevents: "Body recomposition" and "Muscle gain" were client
+  // populations AND assessment findings, the second copy carrying a DEXA_
+  // prefix invented only to dodge the key collision. The form rendered each
+  // twice and the two answers meant nothing different.
+  it("never shows the same label on both lists", () => {
+    const seen = new Map<string, string>();
+    for (const code of [...CLIENT_POPULATIONS, ...ASSESSMENT_FINDINGS]) {
+      const label = CAPABILITY_LABELS[code];
+      const previous = seen.get(label);
+      expect(previous, `"${label}" is both ${previous} and ${code}`).toBeUndefined();
+      seen.set(label, code);
+    }
+  });
+
+  it("keeps goals off the findings list", () => {
+    // A finding is something DexaFit measured. "Fat loss" and "Sports
+    // performance" are what the client wants, which is the other question.
+    for (const code of ASSESSMENT_FINDINGS) {
+      expect(
+        (CLIENT_POPULATIONS as readonly string[]).includes(code),
+        `${code} is on both axes`,
+      ).toBe(false);
+    }
+  });
+});
+
+describe("findings cover what DexaFit actually measures", () => {
+  it("files every finding under the test that produces it", () => {
+    for (const code of ASSESSMENT_FINDINGS) {
+      expect(FINDING_GROUP[code], `${code} has no assessment group`).toBeDefined();
+    }
+  });
+
+  it("covers VO2 max and RMR, not only the DEXA scan", () => {
+    // DexaFit runs three tests. Modelling only the scan meant a provider could
+    // not say they read a VO2 max or set targets from a measured RMR.
+    const groups = new Set(ASSESSMENT_FINDINGS.map((c) => FINDING_GROUP[c]));
+    for (const group of ["BODY_COMPOSITION", "BONE_DENSITY", "CARDIORESPIRATORY", "METABOLIC"] as const) {
+      expect(groups.has(group), `nothing covers ${group}`).toBe(true);
+    }
+  });
+});
+
+describe("every profession can finish step 5", () => {
+  // Step 5 requires at least one client population and at least one finding.
+  // A profession scoped to neither strands the provider on a page they cannot
+  // complete — which is exactly what happened to OTHER when longevity moved
+  // from the findings axis to the populations axis.
+  it.each(PROFESSION_TYPES)("%s has at least one of each", (profession) => {
+    const allowed = new Set(allowedCapabilities([profession]));
+    expect(
+      CLIENT_POPULATIONS.some((c) => allowed.has(c)),
+      `${profession} has no selectable client population`,
+    ).toBe(true);
+    expect(
+      ASSESSMENT_FINDINGS.some((c) => allowed.has(c)),
+      `${profession} has no selectable assessment finding`,
+    ).toBe(true);
   });
 });
