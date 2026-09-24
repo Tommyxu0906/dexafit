@@ -74,6 +74,22 @@ insert into storage.objects (bucket_id, name) values
 -- A provider may not grant themselves anything
 -- ---------------------------------------------------------------------------
 
+-- ---------------------------------------------------------------------------
+-- Bucket configuration
+-- ---------------------------------------------------------------------------
+--
+-- Checked before dropping to the provider role, because storage.buckets is not
+-- readable by `authenticated` — asserted from there it would read NULL and pass
+-- for the wrong reason.
+
+select assert(
+  (select public from storage.buckets where id = 'professional-photos') is true,
+  'the photo bucket is public, which is the point of it');
+
+select assert(
+  (select public from storage.buckets where id = 'professional-documents') is false,
+  'the credential bucket is NOT public');
+
 set local role authenticated;
 select act_as('aaaa0000-0000-4000-8000-000000000001');
 
@@ -222,6 +238,84 @@ $$;
 select assert(
   (select count(*) from storage.objects where name like '%planted%') = 0,
   'provider cannot write into another professional''s document folder');
+
+-- ---------------------------------------------------------------------------
+-- The public photo bucket holds photos and nothing else
+-- ---------------------------------------------------------------------------
+--
+-- The marketplace displays provider photos, so that bucket is public. Every
+-- credential document is one bucket away from being published at a permanent
+-- unauthenticated URL, and the thing standing in between is the insert policy
+-- rather than application code. These assertions are that policy's proof.
+
+-- The one that matters: a credential cannot be smuggled into the public bucket
+-- even by its rightful owner, because the path says CREDENTIAL.
+do $$
+begin
+  insert into storage.objects (bucket_id, name)
+  values ('professional-photos',
+          '1111aaaa-0000-4000-8000-000000000001/CREDENTIAL/smuggled.pdf');
+exception when insufficient_privilege then
+  null;
+end;
+$$;
+select assert(
+  (select count(*) from storage.objects where name like '%smuggled%') = 0,
+  'a CREDENTIAL cannot be written into the public photo bucket');
+
+do $$
+begin
+  insert into storage.objects (bucket_id, name)
+  values ('professional-photos',
+          '1111aaaa-0000-4000-8000-000000000001/INSURANCE_CERTIFICATE/smuggled2.pdf');
+exception when insufficient_privilege then
+  null;
+end;
+$$;
+select assert(
+  (select count(*) from storage.objects where name like '%smuggled2%') = 0,
+  'an INSURANCE_CERTIFICATE cannot be written into the public photo bucket');
+
+-- Ownership still applies inside the public bucket: public to read is not
+-- public to write.
+do $$
+begin
+  insert into storage.objects (bucket_id, name)
+  values ('professional-photos',
+          '2222cccc-0000-4000-8000-000000000003/PROFILE_PHOTO/planted3.png');
+exception when insufficient_privilege then
+  null;
+end;
+$$;
+select assert(
+  (select count(*) from storage.objects where name like '%planted3%') = 0,
+  'provider cannot write a photo into another professional''s folder');
+
+-- And the legitimate case still works, or the guard is just breakage.
+insert into storage.objects (bucket_id, name)
+values ('professional-photos',
+        '1111aaaa-0000-4000-8000-000000000001/PROFILE_PHOTO/mine.png');
+select assert(
+  (select count(*) from storage.objects where name like '%PROFILE_PHOTO/mine.png') = 1,
+  'a provider can still upload their own profile photo');
+
+-- The document row cannot claim to be public when it is not a photo, so the
+-- table and the bucket policy cannot drift apart.
+do $$
+begin
+  insert into professional_documents
+    (professional_id, document_type, bucket, storage_key, original_filename,
+     mime_type, file_size)
+  values ('1111aaaa-0000-4000-8000-000000000001', 'CREDENTIAL', 'professional-photos',
+          '1111aaaa-0000-4000-8000-000000000001/CREDENTIAL/lying.pdf', 'lying.pdf',
+          'application/pdf', 1024);
+exception when check_violation or insufficient_privilege then
+  null;
+end;
+$$;
+select assert(
+  (select count(*) from professional_documents where original_filename = 'lying.pdf') = 0,
+  'a credential document row cannot claim to live in the public bucket');
 
 do $$
 begin

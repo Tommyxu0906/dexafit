@@ -4,7 +4,12 @@ import { captureServerError } from "@/lib/observability";
 import { getOrCreateProfessional } from "@/lib/data/professional";
 import { DOCUMENT_TYPES, type DocumentType } from "@/lib/domain/enums";
 import { createClient } from "@/lib/supabase/server";
-import { DOCUMENT_BUCKET, buildStorageKey, validateUpload } from "@/lib/storage";
+import {
+  bucketForDocumentType,
+  buildStorageKey,
+  isAllowedForDocumentType,
+  validateUpload,
+} from "@/lib/storage";
 
 export async function POST(request: Request) {
   const user = await getSessionUser();
@@ -32,13 +37,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validation.error }, { status: 400 });
   }
 
+  // A profile photo is shown on a public page, so a PDF is refused here even
+  // though it is a fine credential document. Checked against the sniffed type,
+  // never the browser-supplied one.
+  if (!isAllowedForDocumentType(documentType, validation.mimeType)) {
+    return NextResponse.json(
+      { error: "A profile photo must be a JPG, PNG or WebP image." },
+      { status: 400 },
+    );
+  }
+
   // Ownership comes from the session, not from the request body.
   const { profile } = await getOrCreateProfessional(user.id);
   const storageKey = buildStorageKey(profile.id, documentType, validation.extension);
+  // Photos go to the public bucket; everything else stays private. The storage
+  // policy enforces this independently, so a mistake here fails the upload.
+  const bucket = bucketForDocumentType(documentType);
 
   const supabase = await createClient();
   const { error: uploadError } = await supabase.storage
-    .from(DOCUMENT_BUCKET)
+    .from(bucket)
     .upload(storageKey, bytes, {
       contentType: validation.mimeType,
       upsert: false,
@@ -56,6 +74,7 @@ export async function POST(request: Request) {
     .insert({
       professional_id: profile.id,
       document_type: documentType as DocumentType,
+      bucket,
       storage_key: storageKey,
       original_filename: file.name.slice(0, 255),
       mime_type: validation.mimeType,
@@ -68,7 +87,7 @@ export async function POST(request: Request) {
     // Best effort: the caller already has their error. If the rollback itself
     // fails the object is orphaned in storage, which is worth knowing about.
     const { error: rollbackError } = await supabase.storage
-      .from(DOCUMENT_BUCKET)
+      .from(bucket)
       .remove([storageKey]);
     if (rollbackError) {
       captureServerError(rollbackError, {
