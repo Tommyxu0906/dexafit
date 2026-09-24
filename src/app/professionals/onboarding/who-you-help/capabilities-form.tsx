@@ -12,8 +12,11 @@ import { saveCapabilities } from "@/lib/actions/onboarding";
 import { idleState } from "@/lib/actions/state";
 import {
   CAPABILITY_LABELS,
+  ASSESSMENT_FINDINGS,
+  ASSESSMENT_GROUPS,
+  ASSESSMENT_GROUP_LABELS,
+  FINDING_GROUP,
   CLIENT_POPULATIONS,
-  DEXA_CAPABILITIES,
   allowedCapabilities,
   type CapabilityCode,
 } from "@/lib/domain/capabilities";
@@ -33,11 +36,17 @@ export function CapabilitiesForm({
   // are never offered to professions that cannot lawfully claim them.
   const allowed = new Set(allowedCapabilities(professionTypes));
   const populations = CLIENT_POPULATIONS.filter((c) => allowed.has(c));
-  const dexa = DEXA_CAPABILITIES.filter((c) => allowed.has(c));
+  const findings = ASSESSMENT_FINDINGS.filter((c) => allowed.has(c));
+  // Grouped by the test that produces the finding, so a provider is choosing
+  // against something real rather than a flat wall of jargon.
+  const findingGroups = ASSESSMENT_GROUPS.map((group) => ({
+    group,
+    codes: findings.filter((c) => FINDING_GROUP[c] === group),
+  })).filter((g) => g.codes.length > 0);
   const clinical = [...allowed].filter(
     (c) =>
       !(CLIENT_POPULATIONS as readonly string[]).includes(c) &&
-      !(DEXA_CAPABILITIES as readonly string[]).includes(c),
+      !(ASSESSMENT_FINDINGS as readonly string[]).includes(c),
   ) as CapabilityCode[];
 
   const chosen = new Set(selected);
@@ -59,7 +68,7 @@ export function CapabilitiesForm({
 
       <Card>
         <p className="mb-1 text-sm font-semibold text-ink">Client populations</p>
-        <p className="mb-4 text-xs text-muted">Select every group you work with.</p>
+        <p className="mb-4 text-xs text-muted">Select every group you work with, and what they come to you for.</p>
         {errors.clientPopulations ? (
           <p className="mb-3 text-xs font-medium text-rose-600">{errors.clientPopulations}</p>
         ) : null}
@@ -77,22 +86,35 @@ export function CapabilitiesForm({
       </Card>
 
       <Card>
-        <p className="mb-1 text-sm font-semibold text-ink">DEXA findings you can address</p>
+        <p className="mb-1 text-sm font-semibold text-ink">
+          Assessment findings you can act on
+        </p>
         <p className="mb-4 text-xs text-muted">
-          Which scan results are you equipped to act on?
+          DexaFit measures body composition and bone density by DEXA scan,
+          cardiorespiratory fitness by VO&#8322; max test, and metabolic rate by RMR
+          test. Select the results you are equipped to act on.
         </p>
         {errors.dexaCapabilities ? (
           <p className="mb-3 text-xs font-medium text-rose-600">{errors.dexaCapabilities}</p>
         ) : null}
-        <div className="grid gap-2 sm:grid-cols-2">
-          {dexa.map((code) => (
-            <CheckboxRow
-              key={code}
-              name="dexaCapabilities"
-              value={code}
-              label={CAPABILITY_LABELS[code]}
-              defaultChecked={chosen.has(code)}
-            />
+        <div className="flex flex-col gap-5">
+          {findingGroups.map(({ group, codes }) => (
+            <div key={group}>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">
+                {ASSESSMENT_GROUP_LABELS[group]}
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {codes.map((code) => (
+                  <CheckboxRow
+                    key={code}
+                    name="dexaCapabilities"
+                    value={code}
+                    label={CAPABILITY_LABELS[code]}
+                    defaultChecked={chosen.has(code)}
+                  />
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       </Card>

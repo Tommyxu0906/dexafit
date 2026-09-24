@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   CLIENT_POPULATIONS,
-  DEXA_CAPABILITIES,
+  ASSESSMENT_FINDINGS,
   CAPABILITY_LABELS,
   allowedCapabilities,
   type CapabilityCode,
@@ -27,7 +27,7 @@ describe.each(PROFESSION_TYPES)("wizard is completable as %s", (profession) => {
       (CLIENT_POPULATIONS as readonly string[]).includes(c),
     );
     const dexa = allowed.filter((c) =>
-      (DEXA_CAPABILITIES as readonly string[]).includes(c),
+      (ASSESSMENT_FINDINGS as readonly string[]).includes(c),
     );
 
     expect(populations.length, "no client population is selectable").toBeGreaterThan(0);
@@ -119,7 +119,7 @@ describe("holding several qualifications stays walkable", () => {
         (CLIENT_POPULATIONS as readonly string[]).includes(c),
       );
       const dexa = allowed.filter((c) =>
-        (DEXA_CAPABILITIES as readonly string[]).includes(c),
+        (ASSESSMENT_FINDINGS as readonly string[]).includes(c),
       );
       expect(populations.length).toBeGreaterThan(0);
       expect(dexa.length).toBeGreaterThan(0);
